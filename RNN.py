@@ -53,16 +53,20 @@ dnn_clf = tf.contrib.learn.DNNClassifier(hidden_units=[50,10,5], n_classes=2, fe
 dnn_clf.fit(X_train, y_train, batch_size=50, steps=100)
 from sklearn.metrics import accuracy_score
 y_pred = dnn_clf.predict(X_test)
-print(accuracy_score(y_test, list(y_pred)))
-logreg = LogisticRegression()
-logreg.fit(X_train,y_train)
-y_pred = logreg.predict(X_test)
-print(logreg.score(X_test, y_test))'''
-model = Sequential()
-model.add(Dense(5, input_dim=10,activation='relu'))
-model.add(Dense(2,activation='relu'))
-model.add(Dense(1,activation='sigmoid'))
-model.compile(loss='binary_crossentropy', optimizer='adam',metrics=['accuracy'])
-model.fit(X_train, y_train,batch_size=100,epochs=40)
-scores = model.evaluate(X_test,y_test)
-print("\n%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+print(accuracy_score(y_test, list(y_pred)))'''
+def logistic():
+    logreg = LogisticRegression()
+    logreg.fit(X_train,y_train)
+    y_pred = logreg.predict(X_test)
+    print(logreg.score(X_test, y_test))
+
+def NN():
+    model = Sequential()
+    model.add(Dense(10, input_dim=10,activation='relu'))
+    model.add(Dense(5,activation='relu'))
+    model.add(Dense(1,activation='sigmoid'))
+    model.compile(loss='binary_crossentropy', optimizer='adam',metrics=['accuracy'])
+    model.fit(X_train, y_train,batch_size=100,epochs=40)
+    scores = model.evaluate(X_test,y_test)
+    print("\n%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+logistic()
