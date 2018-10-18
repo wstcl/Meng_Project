@@ -42,19 +42,26 @@ data.to_csv('C:\\Users\\93621\\Desktop\\L_LogLabeled.csv')
 '''
 csvname = 'C:\\Users\\93621\\Desktop\\L_LogLabeled.csv'
 data = pd.read_csv(csvname)
-
-X = [i for i in data.columns.tolist() if i not in 'Alarm']
-X = data[X]
+testname = 'C:\\Users\\93621\\Desktop\\LogLabeled.csv'
+test = pd.read_csv(testname)
+X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
+X = data[X_Label]
 y = data['Alarm']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+X = np.array(X)
+X = X.reshape((X.shape[0],1,X.shape[1]))
+X_test = np.array(X_test)
+test_X = test[X_Label]
+test_y = test['Alarm']
+test_X = np.array(test_X)
+test_X = test_X.reshape((test_X.shape[0],1,test_X.shape[1]))
 max_review_length = 10
-embedding_vecor_length = 64
+embedding_vecor_length = 32
 model = Sequential()
-model.add(Embedding(10000, embedding_vecor_length, input_length=max_review_length))
-model.add(LSTM(300))
+model.add(LSTM(128, input_shape=(X.shape[1],X.shape[2])))
 model.add(Dense(1, activation='sigmoid'))
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 print(model.summary())
-model.fit(X_train, y_train, epochs=4, batch_size=64)
-scores = model.evaluate(X_test, y_test)
-print(scores)
+model.fit(X, y, epochs=5, batch_size=64)
+scores = model.evaluate(test_X, test_y)
+print("\n%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
