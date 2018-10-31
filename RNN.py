@@ -1,13 +1,15 @@
 import pandas as pd
-import tensorflow as tf
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
-from keras.layers.embeddings import Embedding
-from keras.preprocessing import sequence
 from sklearn.model_selection import train_test_split
-
+from sklearn.metrics import precision_score,recall_score,f1_score
+def evaluate(y_pred, y_test):
+    pre = precision_score(y_true=y_test,y_pred=y_pred)
+    rec = recall_score(y_true=y_test,y_pred=y_pred)
+    f1 = f1_score(y_true=y_test,y_pred=y_pred)
+    return pre, rec, f1
 
 def data_process(input, output):
     data = pd.read_csv(input)
@@ -47,26 +49,41 @@ def data_process(input, output):
 
 def RNN(csvname):
     data = pd.read_csv(csvname)
+    #test = pd.read_csv('D:\dos_pcap\OCT30MN_output.csv')
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
     X = data[X_Label]
     y = data['Alarm']
     X = np.array(X)
     X = X.reshape((X.shape[0], 1, X.shape[1]))
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+    P_score = []
+    R_score = []
+    F_score = []
+    '''test_x = test[X_Label]
+    test_y = test['Alarm']
+    test_x = np.array(test_x)
+    test_x = test_x.reshape((test_x.shape[0], 1, test_x.shape[1]))'''
 
+    for kfold in range(10):
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40)
+        model = Sequential()
+        model.add(LSTM(256, return_sequences=True, input_shape=(X_train.shape[1],X_train.shape[2])))
+        model.add(LSTM(128))
+        model.add(Dense(1, activation='sigmoid'))
+        model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+        print(model.summary())
+        model.fit(X_train, y_train, epochs=5, batch_size=64)
+        y_pre = model.predict_classes(X_test)
 
+        precision, recall, f1 = evaluate(y_pre,y_test)
+        P_score.append(precision)
+        R_score.append(recall)
+        F_score.append(f1)
+    P_score = np.array(P_score)
+    R_score = np.array(R_score)
+    F_score = np.array(F_score)
+    print("Precision: ", np.mean(P_score),"+-" , np.std(P_score))
+    print("Recall: ", np.mean(R_score), "+-", np.std(R_score))
+    print("F1_socre: ", np.mean(F_score), "+-", np.std(F_score))
 
-    max_review_length = 10
-    embedding_vecor_length = 32
-    model = Sequential()
-    model.add(LSTM(128, input_shape=(X.shape[1],X.shape[2])))
-    model.add(Dense(1, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    print(model.summary())
-    model.fit(X_train, y_train, epochs=5, batch_size=64)
-    scores = model.evaluate(X_test, y_test)
-    print("\n%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
-
-
-#data_process('D:\dos_pcap\OCT27.csv','D:\dos_pcap\OCT27_output.csv')
-RNN('D:\dos_pcap\OCT27_output.csv')
+#data_process('D:\dos_pcap\OCT30MN.csv','D:\dos_pcap\OCT30MN_output.csv')
+RNN('D:\dos_pcap\OCT301_output.csv')
