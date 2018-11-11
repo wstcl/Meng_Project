@@ -6,25 +6,33 @@ do
 	DIV1=$((4))
 	R1=$(($RANDOM%$DIV1))
 	R=$(($RANDOM%$DIV))
-	if [ $R -gt 0 ]; then
+	if [ $R -eq 0 ]; then
 		if [ $R1 -eq 0 ]; then
 		#Incorrect CRC
-			modpoll -r 52210 -0 -1 -t 4 $IP
-			for i in {1..150};
-			do
-			 modpoll -m enc -t 4 -0 -1 -r 32210 -l 1 $IP;
-			done
-			modpoll -r 52211 -0 -1 -t 4  $IP
+			if modpoll -r 52210 -0 -1 $IP > \dev\null 2>&1; then
+			 for i in {1..300};
+			 do
+			  modpoll -m enc -t 4 -0 -1 -r 32210 -l 1 $IP > \dev\null 2>&1;
+			 done	  
+			 until modpoll -r 52211 -0 -1 $IP > \dev\null 2>&1
+				do
+				echo no
+				done
+			fi
 		elif [ $R1 -eq 1 ]; then
 		#scan
-			modpoll -r 52210 -0 -1 -t 4 $IP
-			for i in {1..100};
+			if modpoll -r 52210 -0 -1 $IP > \dev\null 2>&1; then
+			for i in {1..1000};
 			do
 			 modpoll -t 4 -r 42210 -0 -1 -l 1 $IP;
 			done
-			modpoll -r 52211 -0 -1 -t 4 $IP
+			 until modpoll -r 52211 -0 -1 $IP > \dev\null 2>&1
+			  do
+			   echo no
+			  done
+			fi
 		fi
-	elif [ $R -eq 0 ]; then
+	elif [ $R -gt 0 ]; then
 		if [ $R1 -eq 0 ]; then
 		#normal CRC
 			timeout $(($RANDOM%2+1)) modpoll -m enc -t 4 -0 -r 32210 $IP;
