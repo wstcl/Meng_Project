@@ -4,16 +4,14 @@ import keras.backend as K
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score,recall_score,f1_score
-import h5py
-from keras.models import load_model
-import time
-def evaluate(y_pred, y_test):
-    pre = precision_score(y_true=y_test,y_pred=y_pred)
-    rec = recall_score(y_true=y_test,y_pred=y_pred)
-    f1 = f1_score(y_true=y_test,y_pred=y_pred)
-    return pre, rec, f1
+#import h5py
+#from keras.models import load_model
+
+IPhash = {'10.0.0.3':297913,
+          '10.0.0.4':297914,
+          '10.0.0.5':297915,
+          '192.168.100.11':5884431}
+
 
 def f1_score(y_true, y_pred):
     # Count positive samples.
@@ -71,36 +69,68 @@ def data_process(input, output):
     flag = 0
     data = data.fillna('0')
     packets_num = len(data['Alarm'])
+    # IPhash
+    data["SourceIp"].replace(IPhash, inplace=True)
+    data["DestIp"].replace(IPhash, inplace=True)
+    data = data.convert_objects(convert_numeric=True)
     while(i < packets_num):
-        if data['SourceIp'][i] == "192.168.100.11" or data['DestIp'][i] == "192.168.100.11":
+        if data['SourceIp'][i] == 5884431 or data['DestIp'][i] == 5884431:
             if data['Refno'][i] == 52210:
+                index = data['tcp_stream_Index'][i]
                 data.drop([i],inplace=True)
                 i = i + 1
                 flag = 1
                 continue
             if data['Refno'][i] == 52211:
+                index = data['tcp_stream_Index'][i]
                 data.drop([i],inplace=True)
                 i = i + 1
                 flag = 0
                 continue
             if data['Refno'][i] != 52210 and data['Refno'][i] != 52211 and flag == 1:
+                if data['tcp_stream_Index'][i] == index:
+                    data.drop([i], inplace=True)
+                    i = i + 1
+                    continue
                 data['Alarm'][i] = 1
         i = i + 1
 
-    IPsource = data['SourceIp'].unique().tolist()
-    IPdest = data['DestIp'].unique().tolist()
-    IP = list(set(IPsource + IPdest))
-    for j in range(0, len(IP)):
-        data = data.replace(IP[j], j)
+    data = data.convert_objects(convert_numeric=True)
+    #Standardization
+    feature_mean = []
+    feature_std = []
+    for i in headers:
+        mean = data[i].mean()
+        std = data[i].std()
+        feature_mean.append(mean)
+        feature_std.append(std)
+        data[i] = (data[i]-mean)/std
+    with open('result.txt',"a") as f:
+        f.write("\n")
+        f.write('mean and std for: ')
+        f.write(input)
+        f.write("\n")
+        f.write("mean: ")
+        for i in feature_mean:
+            f.write(str(i))
+            f.write(", ")
+        f.write('\n')
+        f.write("std: ")
+        for i in feature_std:
+            f.write(str(i))
+            f.write(", ")
+        f.close()
+    print(feature_mean)
+    print(feature_std)
     data.to_csv(output, index=False)
     print("Processing is over, start training")
 
 
-def RNN(csvname):
+def RNN(csvname,testname):
     data = pd.read_csv(csvname)
     #del(data['tcp_stream_Index'])
     #del(data['Seq_num'])
-    test = pd.read_csv('D:\\dos_pcap\\nov8_output.csv')
+    test = pd.read_csv(testname)
     #del(test['tcp_stream_Index'])
     #del(test['Seq_num'])
     timestep = 5
@@ -138,7 +168,7 @@ def RNN(csvname):
 
     print("Done")
 
-#data_process('D:\\dos_pcap\\nov8L.csv','D:\\dos_pcap\\nov8L_output.csv')
-#data_process('D:\\dos_pcap\\nov8mn.csv','D:\\dos_pcap\\nov8mn_output.csv')
-RNN('D:\\dos_pcap\\nov8L_output.csv')
+data_process('D:\\dos_pcap\\nov8L.csv','D:\\dos_pcap\\nov8L_output.csv')
+data_process('D:\\dos_pcap\\nov8mn.csv','D:\\dos_pcap\\nov8mn_output.csv')
+RNN('D:\\dos_pcap\\nov8L_output.csv','D:\\dos_pcap\\nov8mn_output.csv')
 
