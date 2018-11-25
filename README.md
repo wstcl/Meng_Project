@@ -1,0 +1,7 @@
+# Meng_Project
+This is all of the code for Meng project. 
+The project is to develop a LSTM classifier to identify Denial of service(Dos) attack on a SCADA software testbed
+
+*******************************************************************************************************************
+The RNN.py can process the raw data from the testbed and make a LSTM classification. When using the RNN.py you need to 
+change the location of training dataset and the test dataset. 
