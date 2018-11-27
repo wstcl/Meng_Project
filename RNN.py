@@ -6,7 +6,7 @@ from keras.layers import Dense
 from keras.layers import LSTM
 #import h5py
 #from keras.models import load_model
-
+import time
 IPhash = {'10.0.0.3':297913,
           '10.0.0.4':297914,
           '10.0.0.5':297915,
@@ -58,8 +58,10 @@ def data_reshape(dst, label, timesteps):
     y = Y.reshape(Y.shape[0] // timesteps, timesteps)
     return X, y
 
-def data_process(input, output):
+def data_process(input, attackseq, output):
     data = pd.read_csv(input)
+    ASEQ = pd.read_csv(attackseq)
+    ASEQ = np.array(ASEQ)
     headers = ['SourceIp','DestIp','SourcePort','destPort','tcp_stream_Index','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time']
     data.columns = headers
     new = ["Alarm" ]
@@ -73,30 +75,14 @@ def data_process(input, output):
     data["SourceIp"].replace(IPhash, inplace=True)
     data["DestIp"].replace(IPhash, inplace=True)
     data = data.convert_objects(convert_numeric=True)
+
     while(i < packets_num):
-        if data['SourceIp'][i] == 5884431 or data['DestIp'][i] == 5884431:
-            if data['Refno'][i] == 52210:
-                index = data['tcp_stream_Index'][i]
-                data.drop([i],inplace=True)
-                i = i + 1
-                flag = 1
-                continue
-            if data['Refno'][i] == 52211:
-                index = data['tcp_stream_Index'][i]
-                data.drop([i],inplace=True)
-                i = i + 1
-                flag = 0
-                continue
-            if data['Refno'][i] != 52210 and data['Refno'][i] != 52211 and flag == 1:
-                if data['tcp_stream_Index'][i] == index:
-                    data.drop([i], inplace=True)
-                    i = i + 1
-                    continue
-                data['Alarm'][i] = 1
+        if data['Seq_num'][i] in ASEQ:
+            data['Alarm'][i] = 1
         i = i + 1
 
-    data = data.convert_objects(convert_numeric=True)
     #Standardization
+    '''
     feature_mean = []
     feature_std = []
     for i in headers:
@@ -121,22 +107,22 @@ def data_process(input, output):
             f.write(", ")
         f.close()
     print(feature_mean)
-    print(feature_std)
+    print(feature_std)'''
     data.to_csv(output, index=False)
     print("Processing is over, start training")
 
 
-def RNN(csvname,testname):
+def RNN(csvname):
     data = pd.read_csv(csvname)
     #del(data['tcp_stream_Index'])
     #del(data['Seq_num'])
-    test = pd.read_csv(testname)
+    #test = pd.read_csv(testname)
     #del(test['tcp_stream_Index'])
     #del(test['Seq_num'])
     timestep = 5
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
     X, y = data_reshape(data, X_Label, timestep)
-    test_x, test_y = data_reshape(test, X_Label, timestep)
+    #test_x, test_y = data_reshape(test, X_Label, timestep)
     precision = []
     recall = []
     f1 = []
@@ -148,9 +134,9 @@ def RNN(csvname,testname):
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', f1_score])
         print(model.summary())
         model.fit(X, y, epochs=10, batch_size=1000)
-        #model.save('lstm.h5')
-        y_pre = model.predict(test_x)
-        pscore,rsocre,fscore = classreport(y_pred=y_pre,y_true=test_y)
+        '''#model.save('lstm.h5')
+        #y_pre = model.predict(test_x)
+        #pscore,rsocre,fscore = classreport(y_pred=y_pre,y_true=test_y)
 
         precision.append(pscore)
         recall.append(rsocre)
@@ -163,12 +149,14 @@ def RNN(csvname,testname):
     f1 = np.array(f1)
     print("Precision：",np.mean(precision)," +- ", np.std(precision))
     print("recall：",np.mean(recall)," +- ", np.std(recall))
-    print("f1：",np.mean(f1)," +- ", np.std(f1))
+    print("f1：",np.mean(f1)," +- ", np.std(f1))'''
 
 
     print("Done")
-
-data_process('D:\\dos_pcap\\nov8L.csv','D:\\dos_pcap\\nov8L_output.csv')
-data_process('D:\\dos_pcap\\nov8mn.csv','D:\\dos_pcap\\nov8mn_output.csv')
-RNN('D:\\dos_pcap\\nov8L_output.csv','D:\\dos_pcap\\nov8mn_output.csv')
+start = time.time()
+data_process('D:\\dos_pcap\\nov25_7.csv','D:\\dos_pcap\\full.csv','D:\\dos_pcap\\nov257_output.csv')
+end = time.time()
+print(end-start)
+#data_process('D:\\dos_pcap\\nov8mn.csv','D:\\dos_pcap\\nov8mn_output.csv')
+RNN('D:\\dos_pcap\\nov257_output.csv')
 
