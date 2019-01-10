@@ -4,9 +4,9 @@ import keras.backend as K
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
-#import h5py
-#from keras.models import load_model
-import time
+import h5py
+from keras.models import load_model
+import matplotlib.pyplot as plt
 IPhash = {'10.0.0.3':297913,
           '10.0.0.4':297914,
           '10.0.0.5':297915,
@@ -45,7 +45,32 @@ def classreport(y_true, y_pred):
     f1_score = 2 * (precision * recall) / (precision + recall)
     return precision,recall,f1_score
 
-def data_reshape(dst, label, timesteps):
+def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[]):
+    if feature_mean != []:
+        mean = feature_mean
+        std = feature_std
+        index = 0
+        for i in label:
+            mean = feature_mean[index]
+            std = feature_std[index]
+            dst[i] = (dst[i] - mean) / std
+            index = index + 1
+        print("feature_mean:", feature_mean)
+        print("feature_std:", feature_std)
+    if feature_mean == []:
+        #Standardization
+        feature_mean = []
+        feature_std = []
+        for i in label:
+            mean = dst[i].mean()
+            std = dst[i].std()
+            feature_mean.append(mean)
+            feature_std.append(std)
+            dst[i] = (dst[i] - mean) / std
+        print("feature_mean:", feature_mean)
+        print("feature_std:", feature_std)
+
+    #reshape
     input = dst[label]
     Y = dst['Alarm']
     input = np.array(input)
@@ -56,12 +81,10 @@ def data_reshape(dst, label, timesteps):
         Y = np.delete(Y, Y.shape[0] - i - 1, axis=0)
     X = input.reshape((input.shape[0] // timesteps, timesteps, input.shape[1]))
     y = Y.reshape(Y.shape[0] // timesteps, timesteps)
-    return X, y
+    return X, y,feature_mean,feature_std
 
-def data_process(input, attackseq, output):
+def data_process(input, output):
     data = pd.read_csv(input)
-    ASEQ = pd.read_csv(attackseq)
-    ASEQ = np.array(ASEQ)
     headers = ['SourceIp','DestIp','SourcePort','destPort','tcp_stream_Index','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time']
     data.columns = headers
     new = ["Alarm" ]
@@ -75,68 +98,67 @@ def data_process(input, attackseq, output):
     data["SourceIp"].replace(IPhash, inplace=True)
     data["DestIp"].replace(IPhash, inplace=True)
     data = data.convert_objects(convert_numeric=True)
-
     while(i < packets_num):
-        if data['Seq_num'][i] in ASEQ:
-            data['Alarm'][i] = 1
+        if data['SourceIp'][i] == 5884431 or data['DestIp'][i] == 5884431:
+            if data['Refno'][i] == 52210:
+                index = data['tcp_stream_Index'][i]
+                data.drop([i],inplace=True)
+                i = i + 1
+                flag = 1
+                continue
+            if data['Refno'][i] == 52211:
+                index = data['tcp_stream_Index'][i]
+                data.drop([i],inplace=True)
+                i = i + 1
+                flag = 0
+                continue
+            if data['Refno'][i] != 52210 and data['Refno'][i] != 52211 and flag == 1:
+                if data['tcp_stream_Index'][i] == index:
+                    data.drop([i], inplace=True)
+                    i = i + 1
+                    continue
+                data['Alarm'][i] = 1
         i = i + 1
 
+    data = data.convert_objects(convert_numeric=True)
     #Standardization
-    '''
-    feature_mean = []
-    feature_std = []
-    for i in headers:
-        mean = data[i].mean()
-        std = data[i].std()
-        feature_mean.append(mean)
-        feature_std.append(std)
-        data[i] = (data[i]-mean)/std
-    with open('result.txt',"a") as f:
-        f.write("\n")
-        f.write('mean and std for: ')
-        f.write(input)
-        f.write("\n")
-        f.write("mean: ")
-        for i in feature_mean:
-            f.write(str(i))
-            f.write(", ")
-        f.write('\n')
-        f.write("std: ")
-        for i in feature_std:
-            f.write(str(i))
-            f.write(", ")
-        f.close()
-    print(feature_mean)
-    print(feature_std)'''
+
     data.to_csv(output, index=False)
     print("Processing is over, start training")
 
 
-def RNN(csvname):
+def RNN(csvname,testname):
     data = pd.read_csv(csvname)
-    #del(data['tcp_stream_Index'])
+    del(data['tcp_stream_Index'])
     #del(data['Seq_num'])
-    #test = pd.read_csv(testname)
-    #del(test['tcp_stream_Index'])
+    test = pd.read_csv(testname)
+    del(test['tcp_stream_Index'])
     #del(test['Seq_num'])
     timestep = 5
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
-    X, y = data_reshape(data, X_Label, timestep)
-    #test_x, test_y = data_reshape(test, X_Label, timestep)
+    X, y,features_mean,features_std = data_reshape(data, X_Label, timestep)
+    test_x, test_y,features_mean,features_std = data_reshape(test, X_Label, timestep,features_mean,features_std)
     precision = []
     recall = []
     f1 = []
-    for kfold in range(10):
+    for kfold in range(1):
         model = Sequential()
         model.add(LSTM(256,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
         model.add(LSTM(128))
         model.add(Dense(timestep, activation='sigmoid'))
-        model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', f1_score])
+        model.compile(loss='binary_crossentropy', optimizer='adam')
         print(model.summary())
-        model.fit(X, y, epochs=10, batch_size=1000)
-        '''#model.save('lstm.h5')
-        #y_pre = model.predict(test_x)
-        #pscore,rsocre,fscore = classreport(y_pred=y_pre,y_true=test_y)
+        history = model.fit(X, y, epochs=40, batch_size=1000,validation_data=[test_x,test_y])
+        model.save('lstm.h5')
+        plt.plot(history.history['loss'])
+        plt.plot(history.history['val_loss'])
+        plt.title('model loss')
+        plt.ylabel('loss')
+        plt.xlabel('epoch')
+        plt.legend(['J$_{train}$', 'J$_{cv}$'], loc='upper right')
+        plt.show()
+        y_pre = model.predict(test_x)
+        pscore,rsocre,fscore = classreport(y_pred=y_pre,y_true=test_y)
 
         precision.append(pscore)
         recall.append(rsocre)
@@ -149,14 +171,20 @@ def RNN(csvname):
     f1 = np.array(f1)
     print("Precision：",np.mean(precision)," +- ", np.std(precision))
     print("recall：",np.mean(recall)," +- ", np.std(recall))
-    print("f1：",np.mean(f1)," +- ", np.std(f1))'''
-
-
+    print("f1：",np.mean(f1)," +- ", np.std(f1))
     print("Done")
-start = time.time()
-data_process('D:\\dos_pcap\\nov25_7.csv','D:\\dos_pcap\\full.csv','D:\\dos_pcap\\nov257_output.csv')
-end = time.time()
-print(end-start)
-#data_process('D:\\dos_pcap\\nov8mn.csv','D:\\dos_pcap\\nov8mn_output.csv')
-RNN('D:\\dos_pcap\\nov257_output.csv')
+
+def Performance_evaluation(onlinescv,output):
+    headers = ['SourceIp','DestIp','SourcePort','destPort','tcp_stream_Index','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time']
+    data_process(onlinescv,output)
+    true = pd.read_csv(output)
+    label_true = true['Alarm']
+    predict = pd.read_csv(onlinescv)
+    predict.columns = headers
+    label_pred = predict['Alarm']
+    classreport(label_true,label_pred)
+
+#data_process('D:\\dos_pcap\\Dec2.csv','D:\\dos_pcap\\Dec2_output.csv')
+#data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
+#RNN('D:\\dos_pcap\\Dec2_output.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 
