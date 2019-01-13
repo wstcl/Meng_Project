@@ -174,17 +174,38 @@ def RNN(csvname,testname):
     print("f1：",np.mean(f1)," +- ", np.std(f1))
     print("Done")
 
-def Performance_evaluation(onlinescv,output):
-    headers = ['SourceIp','DestIp','SourcePort','destPort','tcp_stream_Index','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time']
-    data_process(onlinescv,output)
-    true = pd.read_csv(output)
-    label_true = true['Alarm']
-    predict = pd.read_csv(onlinescv)
-    predict.columns = headers
-    label_pred = predict['Alarm']
-    classreport(label_true,label_pred)
+def Performance_evaluation(onlinecsv,output):
+    data = pd.read_csv(onlinecsv)
+    data = np.array(data)
+    y_true = data.copy()
+    start_index = np.argwhere(data[:,7]==52210)
+    end_index = np.argwhere(data[:,7]==52211)
+    start_index = np.concatenate(start_index)
+    end_index = np.concatenate(end_index)
+    Flag_Diff = len(start_index)-len(end_index)
+    if Flag_Diff==0:
+        for i in range(len(start_index)):
+            A_index = np.argwhere(data[start_index[i]:end_index[i],0:2]==5884431) + start_index[i]
+            y_true[A_index[:,0],12]=1
+    elif Flag_Diff == 1:
+        for i in range(len(start_index)-1):
+            A_index = np.argwhere(data[start_index[i]:end_index[i],0:2]==5884431) + start_index[i]
+            y_true[A_index[:,0],12]=1
+        A_index = np.argwhere(data[start_index[-1]:len(data),0:2]==5884431) + start_index[i]
+        y_true[A_index[:,0],12]=1
+    else:
+         raise ValueError('Difference between start and end flag is greater than one.')
+    start_flags = np.append(start_index,start_index+1)
+    end_flags= np.append(end_index,end_index+1)
+    flags=np.append(start_flags,end_flags)
+    y_true = np.delete(y_true,flags,axis = 0)
+    data = np.delete(data,flags,axis=0)
+    truelabel = y_true[:,12]
+    prelabel = data[:,12]
+    print(classreport(y_pred=prelabel,y_true=truelabel))
+    np.savetxt(output,y_true,delimiter=',')
 
 #data_process('D:\\dos_pcap\\Dec2.csv','D:\\dos_pcap\\Dec2_output.csv')
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #RNN('D:\\dos_pcap\\Dec2_output.csv','D:\\dos_pcap\\Dec2_4_output.csv')
-
+Performance_evaluation('D:\dos_pcap\dos_csv\Log.csv','D:\dos_pcap\dos_csv\Label.csv')
