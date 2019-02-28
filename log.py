@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import keras
 from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.layers import Dense
@@ -12,15 +11,6 @@ def evaluate(y_pred, y_test):
     f1 = f1_score(y_true=y_test,y_pred=y_pred)
     return pre, rec, f1
 
-class LossHistory(keras.callbacks.Callback):
-    def on_train_begin(self, logs={}):
-        self.losses = []
-        self.val_losses = []
-
-    def on_batch_end(self,batch,logs={}):
-        self.losses.append(logs.get('loss'))
-        self.val_loss = self.model.evaluate(self.validation_data[0],self.validation_data[1])
-        self.val_losses.append(self.val_loss[0])
 
 def pre_split(input_data, Label):
     X = input_data[Label]
@@ -46,29 +36,34 @@ def logistic(csvname):
     data.columns = headers
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
     X, y = pre_split(data, X_Label)
-    Train_Error = []
-    Test_Error = []
+    P_score = []
+    R_score = []
+    F_score = []
     for kfold in range(1):
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        num_seq = X_train.shape[0]
-        num_sample = [1, 10, 50, 100, 500, 1000, 5000, 10000, 30000, 50000, 100000, num_seq]
-        for sample_size in num_sample:
-            model = Sequential()
-            model.reset_states()
-            model.add(Dense(1,input_dim= 12,activation='sigmoid'))
-            model.compile(loss='binary_crossentropy', optimizer='adam',metrics=['accuracy'])
-            model.fit(X_train[0:sample_size, :], y_train[0:sample_size], epochs=30, shuffle=False)
-            Train_loss = model.evaluate(X_train[0:sample_size, :], y_train[0:sample_size])
-            Validation_loss = model.evaluate(X_test, y_test)
-            Train_Error.append(Train_loss[0])
-            Test_Error.append(Validation_loss[0])
-        plt.figure()
-        plt.plot(num_sample, Train_Error)
-        plt.plot(num_sample, Test_Error)
-        plt.xlabel('Size of training')
-        plt.ylabel('Loss')
-        plt.legend(['J$_{train}$', 'J$_{cv}$'], loc='upper right')
-        plt.savefig('C:\\Users\\93621\\Desktop\\SCADA plot\\Logistic_learning.png')
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        model = Sequential()
+        model.add(Dense(1, input_dim= 12, activation='sigmoid'))
+        model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+        history = model.fit(X_train, y_train, batch_size=1000, epochs=130,validation_split=0.2)
+        plt.plot(history.history['acc'])
+        plt.plot(history.history['val_acc'])   
+        plt.title('Logistic accuracy')     
+        plt.ylabel('accuracy')
+        plt.xlabel('epoch')
+        plt.legend(['train','test'],loc='upper left')
+        plt.show()
+        y_pre = model.predict_classes(X_test)
+        precision, recall, f1 = evaluate(y_pre, y_test)
+        P_score.append(precision)
+        R_score.append(recall)
+        F_score.append(f1)
+        print(confusion_matrix(y_test,y_pre))
+    P_score = np.array(P_score)
+    R_score = np.array(R_score)
+    F_score = np.array(F_score)
+    print("Precision: ", np.mean(P_score), "+-", np.std(P_score))
+    print("Recall: ", np.mean(R_score), "+-", np.std(R_score))
+    print("F1_socre: ", np.mean(F_score), "+-", np.std(F_score))
 
 
 def NN(csvname):
@@ -77,30 +72,35 @@ def NN(csvname):
     data.columns = headers
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
     X, y = pre_split(data, X_Label)
-    Train_Error = []
-    Test_Error = []
+    P_score = []
+    R_score = []
+    F_score = []
     for kfold in range(1):
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        num_seq = X_train.shape[0]
-        num_sample = [1, 10, 100, 1000, 5000, 10000, 50000, 100000, num_seq]
-        for sample_size in num_sample:
-            model = Sequential()
-            model.reset_states()
-            model.add(Dense(256, input_dim=12,activation='tanh'))
-            model.add(Dense(128,activation='tanh'))
-            model.add(Dense(1,activation='sigmoid'))
-            model.compile(loss='binary_crossentropy', optimizer='adam',metrics=['accuracy'])
-            model.fit(X_train[0:sample_size, :], y_train[0:sample_size], epochs=30, shuffle=False)
-            Train_loss = model.evaluate(X_train[0:sample_size, :], y_train[0:sample_size])
-            Validation_loss = model.evaluate(X_test, y_test)
-            Train_Error.append(Train_loss[0])
-            Test_Error.append(Validation_loss[0])
-        plt.figure()
-        plt.plot(num_sample, Train_Error)
-        plt.plot(num_sample, Test_Error)
-        plt.xlabel('Size of training')
-        plt.ylabel('Loss')
-        plt.legend(['J$_{train}$', 'J$_{cv}$'], loc='upper right')
-        plt.savefig('C:\\Users\\93621\\Desktop\\SCADA plot\\NN_learning.png')
-logistic('D:\\dos_pcap\\Label_Jan27b.csv')
-NN('D:\\dos_pcap\\Label_Jan27b.csv')
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        model = Sequential()
+        model.add(Dense(256, input_dim=12,activation='tanh'))
+        model.add(Dense(128,activation='tanh'))
+        model.add(Dense(1,activation='sigmoid'))
+        model.compile(loss='binary_crossentropy', optimizer='adam',metrics=['accuracy'])
+        history = model.fit(X_train, y_train, batch_size=1000, epochs=250,validation_split=0.2)
+        plt.plot(history.history['acc'])
+        plt.plot(history.history['val_acc'])   
+        plt.title('MLP accuracy')     
+        plt.ylabel('accuracy')
+        plt.xlabel('epoch')
+        plt.legend(['train','test'],loc='upper left')
+        plt.show()
+        y_pre = model.predict_classes(X_test)
+        precision, recall, f1 = evaluate(y_pre, y_test)
+        P_score.append(precision)
+        R_score.append(recall)
+        F_score.append(f1)
+        print(confusion_matrix(y_test,y_pre))
+
+    P_score = np.array(P_score)
+    R_score = np.array(R_score)
+    F_score = np.array(F_score)
+    print("Precision: ", np.mean(P_score), "+-", np.std(P_score))
+    print("Recall: ", np.mean(R_score), "+-", np.std(R_score))
+    print("F1_socre: ", np.mean(F_score), "+-", np.std(F_score))
+NN('Label_Jan27b.csv')
