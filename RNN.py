@@ -147,32 +147,32 @@ def RNN(csvname,testname):
     precision = []
     recall = []
     f1 = []
+    num_seq = X.shape[0]
+    num_sample = [1,10,100,1000,5000,10000,15000,20000,num_seq]
+    Train_Error = []
+    Test_Error = []
     for kfold in range(1):
-        model = Sequential()
-        model.add(LSTM(256,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
-        model.add(LSTM(128))
-        model.add(Dense(timestep, activation='sigmoid'))
-        model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
-        history = LossHistory()
-        print(model.summary())
-        model.fit(X, y, validation_split=0.2, epochs=10, batch_size=1000,shuffle = True,callbacks=[history])
+        for sample_size in num_sample:
+            model = Sequential()
+            model.add(LSTM(256,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
+            model.add(LSTM(128))
+            model.add(Dense(timestep, activation='sigmoid'))
+            model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
+            print(model.summary())
+            model.fit(X[0:sample_size,:,:], y[0:sample_size,:], epochs=30,shuffle = False)
+            Train_loss = model.evaluate(X[0:sample_size,:,:], y[0:sample_size,:])
+            Validation_loss =  model.evaluate(test_x,test_y)
+            Train_Error.append(Train_loss[0])
+            Test_Error.append(Validation_loss[0])
         plt.figure()
-        plt.plot(range(len(history.losses)),history.losses)
-        plt.plot(range(len(history.val_losses)),history.val_losses)
-        plt.xlabel('Batch')
+        plt.plot(num_sample,Train_Error)
+        plt.plot(num_sample, Test_Error)
+        plt.xlabel('Size of training')
         plt.ylabel('Loss')
         plt.legend(['J$_{train}$','J$_{cv}$'],loc='upper right')
         plt.show()
-        y_pre = model.predict(test_x)
-        model.save("Lstm.h5")
-        pscore,rsocre,fscore = classreport(y_pred=y_pre,y_true=test_y)
 
-        precision.append(pscore)
-        recall.append(rsocre)
-        f1.append(fscore)
 
-        score = model.evaluate(test_x,test_y,verbose=1)
-        print(score)
     precision = np.array(precision)
     recall = np.array(recall)
     f1 = np.array(f1)
@@ -214,4 +214,4 @@ def Performance_evaluation(onlinecsv,output):
 
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('Test_Log.csv','Label_TL.csv')
-RNN('Label_Jan27b.csv','Label_Jan27a.csv')
+RNN('D:\\dos_pcap\\Label_Jan27b.csv','D:\\dos_pcap\\Label_Jan27a.csv')
