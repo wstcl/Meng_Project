@@ -5,3 +5,5 @@ The project is to develop a LSTM classifier to identify Denial of service(Dos) a
 *******************************************************************************************************************
 The RNN.py can process the raw data from the testbed and make a LSTM classification. When using the RNN.py you need to 
 change the location of training dataset and the test dataset. 
+
+The dostraffic.sh is for generating normal and dos attack traffic.
