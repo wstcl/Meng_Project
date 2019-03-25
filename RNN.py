@@ -151,6 +151,7 @@ def RNN(csvname,testname):
     num_sample = [1,10,100,1000,5000,10000,15000,20000,num_seq]
     Train_Error = []
     Test_Error = []
+    es = keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.000009, patience=5)
     for kfold in range(1):
         for sample_size in num_sample:
             model = Sequential()
@@ -159,18 +160,18 @@ def RNN(csvname,testname):
             model.add(Dense(timestep, activation='sigmoid'))
             model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
             print(model.summary())
-            model.fit(X[0:sample_size,:,:], y[0:sample_size,:], epochs=30,shuffle = False)
+            model.fit(X[0:sample_size,:,:], y[0:sample_size,:], epochs=10000,shuffle = False,callbacks=[es])
             Train_loss = model.evaluate(X[0:sample_size,:,:], y[0:sample_size,:])
             Validation_loss =  model.evaluate(test_x,test_y)
             Train_Error.append(Train_loss[0])
             Test_Error.append(Validation_loss[0])
         plt.figure()
-        plt.plot(num_sample,Train_Error)
-        plt.plot(num_sample, Test_Error)
-        plt.xlabel('Size of training')
+        plt.plot(np.log10(num_sample),Train_Error)
+        plt.plot(np.log10(num_sample), Test_Error)
+        plt.xlabel('Size of training/log10')
         plt.ylabel('Loss')
         plt.legend(['J$_{train}$','J$_{cv}$'],loc='upper right')
-        plt.show()
+        plt.savefig('C:\\Users\\93621\\Desktop\\SCADA plot\\RNN_learning_log.png')
 
 
     precision = np.array(precision)
