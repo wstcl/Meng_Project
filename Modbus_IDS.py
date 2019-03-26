@@ -3,13 +3,17 @@ import numpy as np
 from keras.models import load_model
 import h5py
 import time
-feature_mean = [987077.1708173917, 2134742.0481606494, 17459.159539713866, 26849.103009466908, 37612.68168409985, 9418.126090530171, 5.948326289130788, 19811.18698915624, 19.18415200457282, 0.20418730207737915, 305.4710627127993, 0.013863061511296453]
-feature_std = [1837141.711676915, 2624416.776463739, 21106.398363980843, 21910.772814885655, 45740.66561929073, 11063.244155796494, 6.279870133414408, 18855.33330669925, 39.37499182205279, 0.4031073377214498, 367.18606771190304, 0.032363656194118]
+feature_mean = [1485969.6506835904, 2696469.353480891, 18865.4025525368, 28989.058054477428, 57268.50361900766, 8831.50869261163, 4.708689115004021, 18519.598052379453, 25.74041050386377, 0.20607014231266826, 0.0092014301653904, 482.78965815695653]
+feature_std = [2285964.50843903, 2765235.7987897503, 23168.549619500987, 23445.339534367795, 95452.5125702013, 12625.33563010513, 5.402296630386151, 19521.437757365704, 43.72046432971252, 0.40448215143340616, 0.01920430014961369, 795.0218303168346]
 feature_mean = np.array(feature_mean)
 feature_std = np.array(feature_std)
+timestep = 10
 i = 0
-model = load_model('lstm.h5')
+model = load_model('Lstm.h5')
+csvname = 'MitM.csv'
+flag = 0
 capture = pk.LiveCapture('br0', display_filter = 'mbtcp')
+label_index = 14
 print('Modbus NIDS start, Press CTRL+C to stop')
 while (True):
     for packet in capture.sniff_continuously():
@@ -45,23 +49,43 @@ while (True):
             Excep = 0
         delta_time = packet.frame_info.time_delta_displayed
         stream_time = packet.tcp.time_relative
+        eth_src = packet.eth.src
+        eth_src = eth_src.replace(':','')
+        eth_src = int(eth_src,16)
+        eth_dst = packet.eth.dst
+        eth_dst = eth_dst.replace(':','')
+        eth_dst = int(eth_dst,16)
         if i == 0:
-            raw = np.zeros((5,12))
-        if i < 5:
-            raw[i] = [src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time]
+            raw = np.zeros((timestep,label_index))
+        if i < timestep:
+            #check if this packet is a flag, if yes, record and go to the next loop
+            if Ref_num == 52210 or Ref_num ==52211:
+                flag = 1
+                flag_index=packet.tcp.stream
+                f=open(csvname,'ab')
+                FLP = np.array([src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,eth_src,eth_dst,0])
+                np.savetxt(f,FLP,delimiter=",")
+                f.close()
+                continue
+            #check if this packet is a flag response
+            if flag == 1:
+                if packet.tcp.stream == flag_index:
+                    continue
+            #if not a flag, fit into lstm model
+            raw[i] = [src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,eth_src,eth_dst]
             i = i + 1
-        if i == 5:
+        if i == timestep:
             i = 0
-            input = (raw -feature_mean)/feature_std
-            input = input.reshape((1,5,12))
+            input = (raw[:,0:12] -feature_mean)/feature_std
+            input = input.reshape((1,timestep,12))
             label = model.predict(input) 
             label[label>0.5]=1
             label[label<=0.5]=0
-            output = np.insert(raw,12,label,axis=1)
+            output = np.insert(raw,label_index,label,axis=1)
             if label.any() == 1:
                 print(time.ctime(),"Dos attack detected")
                 print(label)
-            f=open('Log.csv','ab')
+            f=open(csvname,'ab')
             np.savetxt(f,output,delimiter=",")
             f.close()
 
