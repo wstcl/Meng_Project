@@ -13,10 +13,17 @@ model = load_model('Lstm.h5')
 csvname = 'MitM.csv'
 flag = 0
 capture = pk.LiveCapture('br0', display_filter = 'mbtcp')
-label_index = 14
+label_index = 21
 print('Modbus NIDS start, Press CTRL+C to stop')
 while (True):
     for packet in capture.sniff_continuously():
+        HH = 0
+        LL = 0
+        H = 0
+        L = 0
+        speed = 0
+        t1= 0
+        t2 = 0
         src_hash = 0
         dst_hash = 0
         src_ip = packet.ip.src
@@ -49,6 +56,22 @@ while (True):
             Excep = 0
         delta_time = packet.frame_info.time_delta_displayed
         stream_time = packet.tcp.time_relative
+        if src_port == '502':
+            Ref_num = 0
+        if Ref_num == '32210':
+            speed = Reg_data
+        if Ref_num == '42210':
+            t1 = Reg_data
+        if Ref_num == '42211':
+            t2 = Reg_data
+        if Ref_num == '42212':
+            HH = Reg_data
+        if Ref_num == '42213':
+            LL = Reg_data
+        if Ref_num == '42214':
+            H = Reg_data
+        if Ref_num == '42215':
+            L = Reg_data
         eth_src = packet.eth.src
         eth_src = eth_src.replace(':','')
         eth_src = int(eth_src,16)
@@ -59,11 +82,11 @@ while (True):
             raw = np.zeros((timestep,label_index))
         if i < timestep:
             #check if this packet is a flag, if yes, record and go to the next loop
-            if Ref_num == 52210 or Ref_num ==52211:
+            if Ref_num == '52210' or Ref_num =='52211':
                 flag = 1
                 flag_index=packet.tcp.stream
                 f=open(csvname,'ab')
-                FLP = np.array([src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,eth_src,eth_dst,0])
+                FLP = np.array([src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,HH,LL,H,L,speed,t1,t2,eth_src,eth_dst,0])
                 np.savetxt(f,FLP,delimiter=",")
                 f.close()
                 continue
@@ -72,12 +95,12 @@ while (True):
                 if packet.tcp.stream == flag_index:
                     continue
             #if not a flag, fit into lstm model
-            raw[i] = [src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,eth_src,eth_dst]
+            raw[i] = [src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,HH,LL,H,L,speed,t1,t2,eth_src,eth_dst]
             i = i + 1
         if i == timestep:
             i = 0
-            input = (raw[:,0:12] -feature_mean)/feature_std
-            input = input.reshape((1,timestep,12))
+            input = (raw[:,0:label_index-2] -feature_mean)/feature_std
+            input = input.reshape((1,timestep,label_index-2))
             label = model.predict(input) 
             label[label>0.5]=1
             label[label<=0.5]=0
