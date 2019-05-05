@@ -187,11 +187,11 @@ def RNN(csvname):
     X,y = miso_prepare(data,timestep)
     X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.3)
     num_seq = X_train.shape[0]
-    num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,30000,50000,80000,100000,130000,180000,num_seq]
+    num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,30000,50000,80000,100000,130000,num_seq]
     #num_sample = [num_seq]
     neurons = [2,1,4,2,8,4,16,8,32,16,64,32,128,64,256,128,512,256]
     for sample_size in num_sample:
-        es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 2)
+        es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 1)
         print(sample_size,file=open(train,"a"))
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(train,"a"))
         print(sample_size,file=open(test,"a"))
@@ -319,6 +319,6 @@ def Performance_evaluation_multilabel(onlinecsv,output):
 
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
-RNN('pcap file/label_AN_3.csv')
-#RNN('pcap file/label_mitm.csv')
+#RNN('pcap file/label_AN_3.csv')
+RNN('pcap file/label_mitm.csv')
 #Performance_evaluation_multilabel('mtim.csv','Mlabel_Mtim.csv')
