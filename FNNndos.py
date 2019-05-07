@@ -137,6 +137,17 @@ def mul_label(csvname,output):
 
     np.savetxt(output,data,delimiter=',')
 
+def dos_mul(csvfile,output):
+    data = np.loadtxxt(csvfile,delimiter=',')
+    inner = np.argwhere(data[:,0:2]==297913)
+    inner = inner[:,0]
+    mitm_index = np.argwhere(data[inner,19]==1)
+    data[inner[mitm_index],19]=8
+    crc = np.argwhere((data[:,19]==1)&(data[:,9]==1))
+    data[crc,19]=9
+    scan = np.argwhere(data[:,19]==1)
+    data[scan,19]=10
+    np.savetxt(output,data,delimiter=',')
 #label('pcap file/ndos_mitm.csv','pcap file/label_mitm.csv')
 mul_label('pcap file/label_AN_3.csv','pcap file/mulabel_AN_3.csv')
     
