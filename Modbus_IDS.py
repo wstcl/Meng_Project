@@ -2,15 +2,22 @@ import pyshark as pk
 import numpy as np
 from keras.models import load_model
 import h5py
+import os
 import time
-feature_mean = [1485969.6506835904, 2696469.353480891, 18865.4025525368, 28989.058054477428, 57268.50361900766, 8831.50869261163, 4.708689115004021, 18519.598052379453, 25.74041050386377, 0.20607014231266826, 0.0092014301653904, 482.78965815695653]
-feature_std = [2285964.50843903, 2765235.7987897503, 23168.549619500987, 23445.339534367795, 95452.5125702013, 12625.33563010513, 5.402296630386151, 19521.437757365704, 43.72046432971252, 0.40448215143340616, 0.01920430014961369, 795.0218303168346]
-feature_mean = np.array(feature_mean)
-feature_std = np.array(feature_std)
+from keras.utils import to_categorical
+
+feature_mean = np.loadtxt('mean.csv',delimiter=',')
+feature_std = np.loadtxt('std.csv',delimiter=',')
 timestep = 10
 i = 0
-model = load_model('FNN.h5')
-csvname = 'ndos_mitm.csv'
+j = 0
+n_classes = 11
+fnn = load_model('models/FNN.h5')
+lstm = load_model('models/LSTM.h5')
+ensemble = load_model('models/ensemble.h5')
+tm = time.ctime()+'/'
+os.mkdir(tm)
+csvname = tm+'all_classes.csv'
 flag = 0
 capture = pk.LiveCapture('br0', display_filter = 'mbtcp')
 label_index = 21
@@ -81,38 +88,50 @@ while (True):
         eth_dst = int(eth_dst,16)
         
         if i == 0:
-            #raw = np.zeros((timestep,label_index)) lstm
-            raw = np.zeros(label_index)
-        #if i < timestep:
+            raw = np.zeros((timestep,label_index))
+        if i < timestep:
             #check if this packet is a flag, if yes, record and go to the next loop
-            #if Ref_num == '52210' or Ref_num =='52211':
-            #    flag = 1
-            #    flag_index=packet.tcp.stream
-            #    f=open(csvname,'ab')
-            #    FLP = np.array([src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,HH,LL,H,L,speed,t1,t2,eth_src,eth_dst,0])
-            #    np.savetxt(f,FLP,delimiter=",")
-            #    f.close()
-            #    continue
+            if Ref_num == 52210 or Ref_num ==52211:
+                flag = 1
+                flag_index=packet.tcp.stream
+                f=open(csvname,'ab')
+                FLP = np.array([src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,HH,LL,H,L,speed,t1,t2,eth_src,eth_dst,0])
+                np.savetxt(f,FLP,delimiter=",")
+                f.close()
+                continue
             #check if this packet is a flag response
-            #if flag == 1:
-            #    if packet.tcp.stream == flag_index:
-            #        continue
+            if flag == 1:
+                if packet.tcp.stream == flag_index:
+                    continue
             #if not a flag, fit into lstm model
-            raw[:] = [src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,HH,LL,H,L,speed,t1,t2,eth_src,eth_dst] #need to be raw[i]
-            #i = i + 1
-        #if i == timestep:
+            raw[i] = [src_hash,dst_hash,src_port,dst_port,seq_num,trans_ID,Func_Code,Ref_num,Reg_data,Excep,delta_time,stream_time,HH,LL,H,L,speed,t1,t2,eth_src,eth_dst] #need to be raw[i]
+            i = i + 1
+        if i == timestep:
             i = 0
-            raw = raw.reshape((1,21))
-            input = raw[:,0:19] #need to be scaled later for LSTM
-            #input = input.reshape((1,timestep,19))#For LSTM
-            label = model.predict(input) 
-            label[label>0.5]=1
-            label[label<=0.5]=0
+            input = raw[:,0:19] 
+            input = (input-feature_mean)/feature_std
+            input_lstm = input.reshape((1,timestep,19))
+            label_lstm = lstm.predict(input_lstm)
+            label_lstm = label_lstm.reshape((label_lstm.shape[1],label_lstm.shape[2]))
+            label_lstm = np.argmax(label_lstm,axis=1)
+            label_lstm = to_categorical(label_lstm,num_classes=n_classes)
+
+            label_fnn = fnn.predict_classes(input)
+            label_fnn = to_categorical(label_fnn,num_classes=n_classes) 
+            ensemble_input = np.dstack((label_lstm,label_fnn))
+            ensemble_input = np.reshape(ensemble_input,(ensemble_input.shape[0],ensemble_input.shape[1]*ensemble_input.shape[2]))
+            label=ensemble.predict_classes(ensemble_input)
             output = np.insert(raw,label_index,label,axis=1)
-            if label.any() == 1:
-                print(time.ctime(),"Dos attack detected")
+            if label.any() > 0:
+                print(time.ctime(),"Attack detected")
                 print(label)
             f=open(csvname,'ab')
             np.savetxt(f,output,delimiter=",")
             f.close()
+            if os.path.getsize(csvname)>60000000:
+                j = j+1
+                csvname = tm+str(j)+'.csv'
+            if j>15:   #stop capturing
+                break
+
 
