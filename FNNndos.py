@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from sklearn.metrics import classification_report
 '''def label(csvname,output):
     data = pd.read_csv(csvname)
     headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','Alarm']
@@ -37,9 +38,13 @@ def label(csvname,output):
     data_raw = np.array(data_raw)
     data = np.zeros((data_raw.shape[0],label_index+1))
     data[:,0:12]=data_raw[:,0:12]
+    data[:,label_index-2:label_index]=data_raw[:,label_index-2:label_index]
     data[np.argwhere( (data[:,2]==502) & (data[:,6]==16) ),7]=0
-    # Reset all labels = 0
-    data[:,label_index]=0
+    y_pre = data_raw[:,label_index].copy()
+
+
+
+
     #Function code = 16
     Write_index = np.argwhere(data[:,6]==16)
     Write_index = np.concatenate(Write_index)
@@ -47,95 +52,79 @@ def label(csvname,output):
     #Refno =32210
     Label = np.argwhere( (data[Write_index,7]==32210) & ( (data[Write_index,8]<-9) | (data[Write_index,8]>9) ))
     data[Write_index[Label],label_index]=1
-    #index_32210 = np.argwhere(data[:,7]==32210)
-    #data[index_32210,16]=data[index_32210,8]
+    index_32210 = np.argwhere(data[:,7]==32210)
+    data[index_32210,16]=data[index_32210,8]
 
     # Refno =42210
     Label = np.argwhere((data[Write_index, 7] == 42210) & ((data[Write_index, 8] > 95) | (data[Write_index, 8] < 5) ))
-    data[Write_index[Label], label_index] = 1
-    #index_42210 = np.argwhere(data[:,7]==42210)
-    #data[index_42210,17]=data[index_42210,8]
+    data[Write_index[Label], label_index] = 2
+    index_42210 = np.argwhere(data[:,7]==42210)
+    data[index_42210,17]=data[index_42210,8]
 
     # Refno =42211
     Label = np.argwhere((data[Write_index, 7] == 42211) & ((data[Write_index, 8] > 95) | (data[Write_index, 8] < 5)))
-    data[Write_index[Label], label_index] = 1
-    #index_42211 = np.argwhere(data[:,7]==42211)
-    #data[index_42211,18]=data[index_42211,8]
+    data[Write_index[Label], label_index] = 3
+    index_42211 = np.argwhere(data[:,7]==42211)
+    data[index_42211,18]=data[index_42211,8]
 
     # Refno =42212
     Label = np.argwhere((data[Write_index, 7] == 42212) & ( data[Write_index, 8] != 95) )
-    data[Write_index[Label], label_index] = 1
-    #index_42212 = np.argwhere(data[:,7]==42212)
-    #data[index_42212,12]=data[index_42212,8]
+    data[Write_index[Label], label_index] = 4
+    index_42212 = np.argwhere(data[:,7]==42212)
+    data[index_42212,12]=data[index_42212,8]
 
     # Refno =42213
     Label = np.argwhere((data[Write_index, 7] == 42213) & (data[Write_index, 8] != 5))
-    data[Write_index[Label], label_index] = 1
-    #index_42213 = np.argwhere(data[:,7]==42213)
-    #data[index_42213,13]=data[index_42213,8]
+    data[Write_index[Label], label_index] = 5
+    index_42213 = np.argwhere(data[:,7]==42213)
+    data[index_42213,13]=data[index_42213,8]
 
     # Refno =42214
     Label = np.argwhere((data[Write_index, 7] == 42214) & (data[Write_index, 8] != 80))
-    data[Write_index[Label], label_index] = 1
-    #index_42214 = np.argwhere(data[:,7]==42214)
-    #data[index_42214,14]=data[index_42214,8]
+    data[Write_index[Label], label_index] = 6
+    index_42214 = np.argwhere(data[:,7]==42214)
+    data[index_42214,14]=data[index_42214,8]
 
     # Refno =42215
     Label = np.argwhere((data[Write_index, 7] == 42215) & (data[Write_index, 8] != 20))
-    data[Write_index[Label], label_index] = 1
-    #index_42215 = np.argwhere(data[:,7]==42215)
-    #data[index_42215,15]=data[index_42215,8]
+    data[Write_index[Label], label_index] = 7
+    index_42215 = np.argwhere(data[:,7]==42215)
+    data[index_42215,15]=data[index_42215,8]
     
     exter_index = np.argwhere(data[:,19:label_index]==exter_eth)
     mtim_index = np.argwhere(data[exter_index[:,0],0:2]==297913)
     mtim_index = exter_index[mtim_index[:,0],0]
     #mtim_index = np.concatenate(mtim_index)
-    data[mtim_index,label_index] = 1
+    data[mtim_index,label_index] = 8
     data = np.delete(data,[19,20],axis=1)
+
+    start_index = np.argwhere(data[:, 7] == 52210)
+    end_index = np.argwhere(data[:, 7] == 52211)
+    start_index = np.concatenate(start_index)
+    end_index = np.concatenate(end_index)
+    Flag_Diff = len(start_index) - len(end_index)
+    if Flag_Diff==0:
+        for i in range(len(start_index)):
+            A_index = np.argwhere(data[start_index[i]:end_index[i],0:2]==5884431)+start_index[i]
+            data[A_index[:,0],label_index-2]=10
+    elif Flag_Diff == 1:
+        for i in range(len(start_index)-1):
+            A_index = np.argwhere(data[start_index[i]:end_index[i],0:2]==5884431)+start_index[i]
+            data[A_index[:,0],label_index-2]=10
+        A_index = np.argwhere(data[start_index[-1]:len(data),0:2]==5884431)+start_index[i]
+        data[A_index[:,0],label_index-2]=10    #The reason of label_index-2 is I delete the eth two rows after mitm labeling
+    else:
+         raise ValueError('Difference between start and end flag is greater than one.')
+    flags=np.append(start_index,end_index)
+    data = np.delete(data,flags,axis = 0)
+    y_pre = np.delete(y_pre,flags,axis=0)
+    crc = np.argwhere((data[:, label_index-2] == 10) & (data[:, 9] == 1))
+    data[crc, label_index-2] = 9
+
+    print(classification_report(y_pre,data[:,label_index-2]))
     np.savetxt(output,data,delimiter=',')
 
 
-
-def mul_label(csvname,output):
-    label_index = 19
-    data = pd.read_csv(csvname)
-    data = np.array(data)
-    data[np.argwhere( (data[:,2]==502) & (data[:,6]==16) ),7]=0
-    # Reset all labels = 0
-    data[:,label_index]=0
-    #Function code = 16
-    Write_index = np.argwhere(data[:,6]==16)
-    Write_index = np.concatenate(Write_index)
-
-    #Refno =32210
-    Label = np.argwhere( (data[Write_index,7]==32210) & ( (data[Write_index,8]<-9) | (data[Write_index,8]>9) ))
-    data[Write_index[Label],label_index]=1
-
-    # Refno =42210
-    Label = np.argwhere((data[Write_index, 7] == 42210) & ((data[Write_index, 8] > 95) | (data[Write_index, 8] < 5) ))
-    data[Write_index[Label], label_index] = 2
-
-    # Refno =42211
-    Label = np.argwhere((data[Write_index, 7] == 42211) & ((data[Write_index, 8] > 95) | (data[Write_index, 8] < 5)))
-    data[Write_index[Label], label_index] = 3
-
-    # Refno =42212
-    Label = np.argwhere((data[Write_index, 7] == 42212) & ( data[Write_index, 8] != 95) )
-    data[Write_index[Label], label_index] = 4
-
-    # Refno =42213
-    Label = np.argwhere((data[Write_index, 7] == 42213) & (data[Write_index, 8] != 5))
-    data[Write_index[Label], label_index] = 5
-
-    # Refno =42214
-    Label = np.argwhere((data[Write_index, 7] == 42214) & (data[Write_index, 8] != 80))
-    data[Write_index[Label], label_index] = 6
-
-    # Refno =42215
-    Label = np.argwhere((data[Write_index, 7] == 42215) & (data[Write_index, 8] != 20))
-    data[Write_index[Label], label_index] = 7
-
-    np.savetxt(output,data,delimiter=',')
 
 def dos_mul(csvfile,output):
     data = np.loadtxxt(csvfile,delimiter=',')
@@ -148,8 +137,8 @@ def dos_mul(csvfile,output):
     scan = np.argwhere(data[:,19]==1)
     data[scan,19]=10
     np.savetxt(output,data,delimiter=',')
-#label('pcap file/ndos_mitm.csv','pcap file/label_mitm.csv')
-mul_label('pcap file/label_AN_3.csv','pcap file/mulabel_AN_3.csv')
+label('pcap file/all.csv','pcap file/la.csv')
+#mul_label('pcap file/label_AN_3.csv','pcap file/mulabel_AN_3.csv')
     
 
 
