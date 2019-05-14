@@ -2,14 +2,12 @@ import pandas as pd
 import numpy as np
 import keras.backend as K
 from keras.models import Sequential
-from keras.models import load_model
 from keras.layers import Dense
 from keras.layers import LSTM
 import keras
-from keras.callbacks import EarlyStopping,ModelCheckpoint
+from keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
-from sklearn import preprocessing
 import matplotlib.pyplot as plt
 import random
 import time
@@ -24,9 +22,9 @@ IPhash = {'10.0.0.3':297913,
 
 
 def evaluate(y_pred, y_test):
-    pre = precision_score(y_true=y_test,y_pred=y_pred)
-    rec = recall_score(y_true=y_test,y_pred=y_pred)
-    f1 = f1_score(y_true=y_test,y_pred=y_pred)
+    pre = precision_score(y_true=y_test,y_pred=y_pred,average='macro')
+    rec = recall_score(y_true=y_test,y_pred=y_pred,average='macro')
+    f1 = f1_score(y_true=y_test,y_pred=y_pred,average='macro')
     return pre, rec, f1
 
 class LossHistory(keras.callbacks.Callback):
@@ -41,7 +39,7 @@ class LossHistory(keras.callbacks.Callback):
 
 
 
-def data_reshape_multilabel(dst, label, timesteps,feature_mean=[], feature_std=[],model=1):
+def data_reshape_multilabel(dst, label, timesteps,feature_mean=[], feature_std=[],n_labels=1):
     if feature_mean != []:
         mean = feature_mean
         std = feature_std
@@ -73,17 +71,14 @@ def data_reshape_multilabel(dst, label, timesteps,feature_mean=[], feature_std=[
     Y = dst['Alarm']
     input = np.array(input)
     Y = np.array(Y)
-    Y = to_categorical(Y)
+    Y = to_categorical(Y,num_classes=n_labels)
     print(Y)
     drop = input.shape[0] % timesteps
     for i in range(drop):
         input = np.delete(input, input.shape[0] - i - 1, axis=0)
         Y = np.delete(Y, Y.shape[0] - i - 1, axis=0)
     X = input.reshape((input.shape[0]//timesteps, timesteps, input.shape[1]))
-    if model == 0:    #many-one
-        y = Y.reshape(Y.shape[0] // timesteps, timesteps*3)
-    if model == 1:    #many-many
-        y = Y.reshape(Y.shape[0]//timesteps,timesteps,2)
+    y = Y.reshape(Y.shape[0]//timesteps,timesteps*n_labels)
     return X, y,feature_mean,feature_std
 
 def pre_split(X,y,test_size):
@@ -102,7 +97,7 @@ def pre_split(X,y,test_size):
     y_test = y[test_indx]
     return X_train, y_train, X_test,y_test,train_indx,test_indx
 
-def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[]):
+def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[],n_labels=1):
     if feature_mean != []:
         mean = feature_mean
         std = feature_std
@@ -140,30 +135,9 @@ def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[]):
         input = np.delete(input, input.shape[0] - i - 1, axis=0)
         Y = np.delete(Y, Y.shape[0] - i - 1, axis=0)
     X = input.reshape((input.shape[0]//timesteps, timesteps, input.shape[1]))
-    y = Y.reshape(Y.shape[0] // timesteps, timesteps)
+    Y = to_categorical(Y,num_classes=n_labels)
+    y = Y.reshape(Y.shape[0] // timesteps, timesteps*n_labels)
     return X, y,feature_mean,feature_std
-
-def miso_prepare(data,timesteps):
-    data = np.array(data)
-    n_p = data.shape[0]
-    X_raw = data[:,:-1]
-    X_raw = preprocessing.scale(X_raw)
-    X = np.zeros((n_p-timesteps,timesteps,data.shape[1]-1))
-    y = np.zeros((n_p-timesteps,timesteps)) #need to be rescheduled for multi_label
-    #print(X.shape)
-    y_raw = data[:,-1] #reschedule for multi-label
-    for i in range(timesteps,n_p):
-        X[i-timesteps]=X_raw[i-timesteps:i,:]
-        y[i-timesteps]=y_raw[i-timesteps:i]
-    print(X.shape)
-    print(y.shape)
-    return X,y
-
-
-    
-
-
-
 
 def RNN(csvname):
     data = pd.read_csv(csvname)
@@ -171,17 +145,15 @@ def RNN(csvname):
     #headers = ['SourceIp', 'DestIp', 'SourcePort', 'destPort', 'Seq_num', 'Trans_Id', 'funcCode', 'Refno',
                #'Register_data', 'Exeption_Code', 'Time_Stamp', 'Relative_Time', 'Alarm']
 
-    #headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','HH','LL','H','L','speed','t1','t2','Alarm']
-    #data.columns = headers
-    print("please add comment:")
-    comment = input()
-    tm = time.ctime() +'_'+comment+ '/'
-    path = '/opt/jungao/RNN_results/'
+    headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','HH','LL','H','L','speed','t1','t2','Alarm']
+    data.columns = headers
+    tm = time.ctime() + '/'
+    path = 'RNN_results/'
     os.mkdir(path + tm)
     os.mkdir(path + tm + 'model/')
     train = path + tm + "train.csv"
     test = path + tm + "test.csv"
-
+    n_labels=8
     indices_test = path + tm + "indices_test.csv"
     
     model_path = path + tm + 'model/'
@@ -189,52 +161,45 @@ def RNN(csvname):
     #del(data['eth_dst'])
 
     timestep = 10
-    #X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
-    #X, y,features_mean,features_std = data_reshape(data, X_Label, timestep)
-    X,y = miso_prepare(data,timestep)
-    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.3)
+    X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
+    X, y,features_mean,features_std = data_reshape_multilabel(data, X_Label, timestep,n_labels=n_labels)
+    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.2)
+    #test_x, test_y,features_mean,features_std = data_reshape(test, X_Label, timestep,features_mean,features_std)
     num_seq = X_train.shape[0]
-    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,30000,50000,80000,100000,130000,num_seq]
-    num_sample = [80000,130000,num_seq]
+    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,14000,15000,17000,num_seq]
+    num_sample = [num_seq]
     neurons = [2,1,4,2,8,4,16,8,32,16,64,32,128,64,256,128,512,256]
     for sample_size in num_sample:
-        es = EarlyStopping(monitor='loss',min_delta=1e-5, patience = 1)
+        es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 5)
         print(sample_size,file=open(train,"a"))
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(train,"a"))
         print(sample_size,file=open(test,"a"))
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(test,"a"))
         
         
-        for kfold in range(10):
+        for kfold in range(1):
             model = Sequential()
-            
-            mc = ModelCheckpoint(model_path+"best.h5",monitor='loss',save_best_only=True,verbose=1,mode='min')
-            model.reset_states()
             indx = np.array(random.sample(range(X_train.shape[0]), sample_size))
-            model.add(LSTM(64,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
-            model.add(LSTM(32))
+            model.add(LSTM(128,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
+            model.add(LSTM(64))
 
-            model.add(Dense(timestep, activation='sigmoid'))
+            model.add(Dense(n_labels*timestep, activation='sigmoid'))
             model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
             print(model.summary())
-            model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =1000,shuffle = True,callbacks=[es,mc])
-            model = load_model(model_path+"best.h5")
+            model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =2000,shuffle = True,callbacks=[es])
+            model.save(model_path+str(sample_size)+'_'+str(kfold)+'.h5')
             y_pre = model.predict(X_train[indx])
-            y_pre = y_pre.reshape((y_pre.shape[0]*timestep,1))
-            y_pre[y_pre>=0.5]=1
-            y_pre[y_pre<0.5]=0
-            #y_pre = np.argmax(y_pre,axis=1)
-            y_true = y_train[indx].reshape((y_train[indx].shape[0]*timestep,1))
-            #y_true = np.argmax(y_true,axis=1)
-            #y_true = y_train[indx]
+            y_pre = y_pre.reshape((y_pre.shape[0]*timestep,n_labels))
+            y_pre = np.argmax(y_pre,axis=1)
+            y_true = y_train[indx].reshape((y_train[indx].shape[0]*timestep,n_labels))
+            y_true = np.argmax(y_true,axis=1)
+
             y_pre_test = model.predict(X_test)
-            y_pre_test = y_pre_test.reshape((y_pre_test.shape[0] * timestep, 1))
-            y_pre_test[y_pre_test>=0.5]=1
-            y_pre_test[y_pre_test<0.5]=0
-            #y_pre_test = np.argmax(y_pre_test, axis=1)
-            y_test_true = y_test.reshape((y_test.shape[0]*timestep,1))
-            #y_test_true = np.argmax(y_test_true,axis=1)
-            #y_test_true = y_test
+            y_pre_test = y_pre_test.reshape((y_pre_test.shape[0] * timestep, n_labels))
+            y_pre_test = np.argmax(y_pre_test, axis=1)
+            y_test_true = y_test.reshape((y_test.shape[0]*timestep,n_labels))
+            y_test_true = np.argmax(y_test_true,axis=1)
+
             ptrain, rtrain, ftrain = evaluate(y_pre, y_true)
             ptest, rtest, ftest = evaluate(y_pre_test, y_test_true)
 
@@ -329,6 +294,24 @@ def Performance_evaluation_multilabel(onlinecsv,output):
 
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
-#RNN('pcap file/label_AN_3.csv')
-RNN('pcap file/label_mitm.csv')
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
+#RNN('pcap file/mulabel_AN_3.csv')
+#RNN('pcap file/label_mitm.csv')
+from keras.models import load_model
+from sklearn.preprocessing import scale
+lstm =load_model('9059_0.h5')
+data =np.loadtxt('pcap file/all_mclass.csv',delimiter=',')
+data = np.delete(data,data.shape[0]-1,axis=0)
+X=data[:,:-1]
+X = scale(X)
+X = X.reshape((X.shape[0]//20,20,19))
+y=data[:,-1]
+y[y<8]=0
+y[y==8]=1
+y[y==9]=2
+y[y==10]=3
+label=lstm.predict(X)
+label=label.reshape(label.shape[0]*20,4)
+label=np.argmax(label,axis=1)
+print(f1_score(y,label,average='macro'))
 #Performance_evaluation_multilabel('mtim.csv','Mlabel_Mtim.csv')
