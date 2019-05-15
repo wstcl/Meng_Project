@@ -8,7 +8,7 @@ import time
 import os
 import h5py
 from keras.utils import to_categorical
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score,classification_report
 
 def evaluate(y_pred, y_test):
     pre = precision_score(y_true=y_test,y_pred=y_pred,average='micro')
@@ -20,7 +20,8 @@ def data_pre(file,lstm,fnn):
     timestep = 10
     lstm_model = load_model(lstm)
     data=np.loadtxt(file,delimiter=',')
-    drop = data.shape[0] % timestep
+    for kfold in range(10):
+        drop = data.shape[0] % timestep
     for i in range(drop):
         data = np.delete(data, data.shape[0] - i - 1, axis=0)
     true_label = data[:,-1]
@@ -30,18 +31,21 @@ def data_pre(file,lstm,fnn):
     x_l = X.reshape(X.shape[0]//timestep,timestep,X.shape[1])
     #y_l = Y.reshape(Y.shape[0]//timestep,timestep,Y.shape[1])
     l_pre = lstm_model.predict(x_l)
-    l_pre = l_pre.reshape((l_pre.shape[0]*timestep,l_pre.shape[2]))
+    l_pre = l_pre.reshape((l_pre.shape[0]*timestep,l_pre.shape[1]//timestep))
     l_pre = np.argmax(l_pre,axis=1)
+    print('LSTM_f1:', f1_score(true_label, l_pre,average='macro'))
     l_pre = to_categorical(l_pre)
     #FNN
     fnn_model = load_model(fnn)
     x_f = X
     f_pre = fnn_model.predict(x_f)
     f_pre = np.argmax(f_pre, axis=1)
+    print('fnn_f1:',f1_score(true_label,f_pre,average='macro'))
     f_pre = to_categorical(f_pre)
     stackX = np.dstack((l_pre, f_pre))
-    stackX = np.reshape(stackX, (stackX.shape[0],stackX.shape[1]*stackX.shape[2]))
     print(stackX.shape)
+    stackX = np.reshape(stackX, (stackX.shape[0],stackX.shape[1]*stackX.shape[2]))
+    #print(stackX.shape)
     print(Y.shape)
     return stackX, Y
 
@@ -62,33 +66,40 @@ def pre_split(X,y,test_size):
     return X_train, y_train, X_test,y_test,train_indx,test_indx
 
 def ensemble():
+    if len(sys.argv)==1:
+        cm = ''
+    else:
+        cm = sys.argv[1]
     path = 'ensemble_model/'
-    tm = time.ctime() + '/'
+    print('Please add comment:')
+
+    tm = time.ctime() +'_'+cm+ '/'
     os.mkdir(path + tm)
     os.mkdir(path + tm + 'model/')
     train = path + tm + "train.csv"
     test = path + tm + "test.csv"
     n_labels = 11
     indices_test = path + tm + "indices_test.csv"
-
+    report = path + tm + "classification_report.txt"
     model_path = path + tm + 'model/'
-    X,y = data_pre('pcap file/all_mclass.csv', 'ensemble_model/LSTM.h5', 'ensemble_model/FNN.h5')
-    X_train, y_train, X_test, y_test, train_indx, test_indx = pre_split(X, y, test_size=0.3)
+    X,y = data_pre('pcap file/1p5m.csv', 'ensemble_model/LSTM.h5', 'ensemble_model/FNN.h5')
+    X_train, y_train, X_test, y_test, train_indx, test_indx = pre_split(X, y, test_size=0.05)
     sample_size = X_train.shape[0]
     print(sample_size, file=open(train, "a"))
     print("Precision", ',', "Recall", ',', "F1", ',', "Accuray", ',', "loss", file=open(train, "a"))
     print(sample_size, file=open(test, "a"))
     print("Precision", ',', "Recall", ',', "F1", ',', "Accuray", ',', "loss", file=open(test, "a"))
         
-    for kfold in range(10):
+    for kfold in range(1):
         model=Sequential()
         indx = np.array(random.sample(range(X_train.shape[0]), sample_size))
         es = EarlyStopping(monitor='loss', min_delta=1e-6, patience=35)
         model.reset_states()
-        #model.add(Dense(100,activation='relu'))
+        model.add(Dense(50,activation='relu'))
         model.add(Dense(n_labels,activation='softmax'))
         model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['categorical_accuracy'])
         model.fit(X_train[indx], y_train[indx], batch_size=1000, shuffle=True, epochs=10000, callbacks=[es])
+        model.save(model_path+str(sample_size)+'_'+str(kfold)+".h5")
         y_pre_train = model.predict_classes(X_train[indx])
         y_pre_test = model.predict_classes(X_test)
         # print(X_test)
@@ -105,5 +116,11 @@ def ensemble():
         loss_test = atest[0]
         print(ptest, ',', rtest, ',', ftest, ',', acc_test, ',', loss_test, file=open(test, "a"))
         print(ptrain, ',', rtrain, ',', ftrain, ',', acc_train, ',', loss_train, file=open(train, "a"))
+    class_report = classification_report(y_true_test, y_pre_test)
+    np.savetxt(report, class_report, fmt="%s", delimiter=',')
 
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 ensemble()
+#X,y = data_pre('pcap file/Sun_la.csv', 'ensemble_model/LSTM.h5', 'ensemble_model/FNN.h5')
+#model = load_model('ensemble_model/ensemble.h5')
+#print(model.evaluate(X,y))

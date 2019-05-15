@@ -1,5 +1,6 @@
 import csv
 import statistics
+from sklearn.metrics import classification_report
 import numpy as np
 def process(csvname,output):
     with open(csvname) as csvfile:
@@ -80,7 +81,15 @@ def get_mean_std(csvfile):
         std[i] =data[:,i].std()
     return mean, std
         
-        
+def get_class_report(report):
+    report = report.split('\n')
+    csv = np.zeros((11,3))
+    for i in range(2,13):
+        report[i]=report[i].split()
+        for j in range(1,len(report[i])-1):
+            csv[i-2][j-1]=float(report[i][j])
+    print(csv)
+    np.savetxt('2lfnn_classification_report.csv',csv,delimiter=',')
 
 #process('FNN_results/dos_mitm_l2/test.csv','FNN_results/dos_mitm_l2/test_mean.csv')
 #process('FNN_results/dos_mitm_l2/train.csv','FNN_results/dos_mitm_l2/train_mean.csv')
@@ -90,11 +99,13 @@ def get_mean_std(csvfile):
 #process('FNN_results/Tue Apr 16 18:06:42 2019/train.csv','hlayers_res.csv')
 #process('FNN_results/Tue Apr 16 20:14:32 2019/train.csv','hlayers_res.csv')
 #process('FNN_results/Tue Apr 16 20:17:37 2019/train.csv','hlayers_res.csv')
-m,s = get_mean_std('pcap file/gather.csv')
-np.savetxt('shared/mean.csv',m,delimiter=',')
-np.savetxt('shared/std.csv',s,delimiter=',')
-
-
-
-
+#m,s = get_mean_std('pcap file/1p5m.csv')
+#np.savetxt('shared/mean.csv',m,delimiter=',')
+#np.savetxt('shared/std.csv',s,delimiter=',')
+label = np.loadtxt('FNN_results/3lbar/indices_test.txt',delimiter=',')
+true = label[1,:]
+pre = label[2,:]
+c = classification_report(true,pre)
+print(c)
+#get_class_report(c)
 

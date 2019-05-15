@@ -7,7 +7,7 @@ from keras.layers import LSTM
 import keras
 from keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score,classification_report
 import matplotlib.pyplot as plt
 import random
 import time
@@ -15,11 +15,11 @@ import os
 import h5py
 from keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
+import sys
 IPhash = {'10.0.0.3':297913,
           '10.0.0.4':297914,
           '10.0.0.5':297915,
           '192.168.100.11':5884431}
-
 
 def evaluate(y_pred, y_test):
     pre = precision_score(y_true=y_test,y_pred=y_pred,average='macro')
@@ -136,10 +136,14 @@ def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[],n_labels=
         Y = np.delete(Y, Y.shape[0] - i - 1, axis=0)
     X = input.reshape((input.shape[0]//timesteps, timesteps, input.shape[1]))
     Y = to_categorical(Y,num_classes=n_labels)
-    y = Y.reshape(Y.shape[0] // timesteps, timesteps*n_labels)
+    y = Y.reshape(Y.shape[0] // timesteps, timesteps,n_labels)
     return X, y,feature_mean,feature_std
 
 def RNN(csvname):
+    if len(sys.argv)==1:
+        cm = ''
+    else:
+        cm = sys.argv[1]
     data = pd.read_csv(csvname)
     data = data.dropna()
     #headers = ['SourceIp', 'DestIp', 'SourcePort', 'destPort', 'Seq_num', 'Trans_Id', 'funcCode', 'Refno',
@@ -147,14 +151,15 @@ def RNN(csvname):
 
     headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','HH','LL','H','L','speed','t1','t2','Alarm']
     data.columns = headers
-    tm = time.ctime() + '/'
+    tm = time.ctime() +'_'+cm+ '/'
     path = 'RNN_results/'
     os.mkdir(path + tm)
     os.mkdir(path + tm + 'model/')
     train = path + tm + "train.csv"
     test = path + tm + "test.csv"
-    n_labels=8
+    n_labels=11
     indices_test = path + tm + "indices_test.csv"
+    report = path+tm+"classification_report.txt"
     
     model_path = path + tm + 'model/'
     #del(data['eth_src'])
@@ -163,11 +168,11 @@ def RNN(csvname):
     timestep = 10
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
     X, y,features_mean,features_std = data_reshape_multilabel(data, X_Label, timestep,n_labels=n_labels)
-    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.2)
+    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.3)
     #test_x, test_y,features_mean,features_std = data_reshape(test, X_Label, timestep,features_mean,features_std)
     num_seq = X_train.shape[0]
-    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,14000,15000,17000,num_seq]
-    num_sample = [num_seq]
+    num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,14000,15000,30000,80000,num_seq]
+    #num_sample = [num_seq]
     neurons = [2,1,4,2,8,4,16,8,32,16,64,32,128,64,256,128,512,256]
     for sample_size in num_sample:
         es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 5)
@@ -177,7 +182,7 @@ def RNN(csvname):
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(test,"a"))
         
         
-        for kfold in range(1):
+        for kfold in range(10):
             model = Sequential()
             indx = np.array(random.sample(range(X_train.shape[0]), sample_size))
             model.add(LSTM(128,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
@@ -211,7 +216,7 @@ def RNN(csvname):
             loss_test = atest[0]
             print(ptrain, ',', rtrain, ',', ftrain, ',', acc_train, ',', loss_train, file=open(train, "a"))
             print(ptest, ',', rtest, ',', ftest, ',', acc_test, ',', loss_test, file=open(test, "a"))
-            if sample_size==num_seq:
+            if sample_size==num_seq and kfold==10:
                 labels = np.zeros((2, y_pre_test.shape[0]))
                 labels[0, :] = np.transpose(y_test_true)
                 labels[1, :] = np.transpose(y_pre_test)
@@ -295,23 +300,24 @@ def Performance_evaluation_multilabel(onlinecsv,output):
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
-#RNN('pcap file/mulabel_AN_3.csv')
-#RNN('pcap file/label_mitm.csv')
+RNN('pcap file/1p5m.csv')
+#RNN('label_mitm_mul.csv')
+'''
 from keras.models import load_model
 from sklearn.preprocessing import scale
-lstm =load_model('9059_0.h5')
+lstm =load_model('16105_0.h5')
 data =np.loadtxt('pcap file/all_mclass.csv',delimiter=',')
 data = np.delete(data,data.shape[0]-1,axis=0)
 X=data[:,:-1]
 X = scale(X)
-X = X.reshape((X.shape[0]//20,20,19))
+X = X.reshape((X.shape[0]//10,10,19))
 y=data[:,-1]
 y[y<8]=0
 y[y==8]=1
 y[y==9]=2
 y[y==10]=3
 label=lstm.predict(X)
-label=label.reshape(label.shape[0]*20,4)
+label=label.reshape(label.shape[0]*10,4)
 label=np.argmax(label,axis=1)
-print(f1_score(y,label,average='macro'))
-#Performance_evaluation_multilabel('mtim.csv','Mlabel_Mtim.csv')
+print(classification_report(y,label))
+#Performance_evaluation_multilabel('mtim.csv','Mlabel_Mtim.csv')'''
