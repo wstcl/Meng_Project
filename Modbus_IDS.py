@@ -112,7 +112,7 @@ while (True):
             input = (input-feature_mean)/feature_std
             input_lstm = input.reshape((1,timestep,19))
             label_lstm = lstm.predict(input_lstm)
-            label_lstm = label_lstm.reshape((label_lstm.shape[1],label_lstm.shape[2]))
+            label_lstm = label_lstm.reshape((timestep,n_classes))
             label_lstm = np.argmax(label_lstm,axis=1)
             label_lstm = to_categorical(label_lstm,num_classes=n_classes)
 
