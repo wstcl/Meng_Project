@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics import classification_report
+import sys
 '''def label(csvname,output):
     data = pd.read_csv(csvname)
     headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','Alarm']
@@ -137,7 +138,7 @@ def dos_mul(csvfile,output):
     scan = np.argwhere(data[:,19]==1)
     data[scan,19]=10
     np.savetxt(output,data,delimiter=',')
-label('pcap file/all.csv','pcap file/la.csv')
+label(sys.argv[1],sys.argv[2])
 #mul_label('pcap file/label_AN_3.csv','pcap file/mulabel_AN_3.csv')
     
 

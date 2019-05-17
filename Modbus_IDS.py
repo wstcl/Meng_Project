@@ -11,6 +11,7 @@ feature_std = np.loadtxt('std.csv',delimiter=',')
 timestep = 10
 i = 0
 j = 0
+turn = 0
 n_classes = 11
 fnn = load_model('models/FNN.h5')
 lstm = load_model('models/LSTM.h5')
@@ -23,6 +24,8 @@ capture = pk.LiveCapture('br0', display_filter = 'mbtcp')
 label_index = 21
 print('Modbus NIDS start, Press CTRL+C to stop')
 while (True):
+    if j ==15:
+        break
     for packet in capture.sniff_continuously():
         src_hash = 0
         dst_hash = 0
@@ -109,6 +112,7 @@ while (True):
         if i == timestep:
             i = 0
             input = raw[:,0:19] 
+            
             input = (input-feature_mean)/feature_std
             input_lstm = input.reshape((1,timestep,19))
             label_lstm = lstm.predict(input_lstm)
@@ -128,10 +132,8 @@ while (True):
             f=open(csvname,'ab')
             np.savetxt(f,output,delimiter=",")
             f.close()
-            if os.path.getsize(csvname)>60000000:
+            if os.path.getsize(csvname)>60000000 and j<15:
                 j = j+1
                 csvname = tm+str(j)+'.csv'
-            if j>15:   #stop capturing
-                break
-
-
+                if j!=0 and j%3==0:
+                    break
