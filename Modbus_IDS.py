@@ -112,7 +112,7 @@ while (True):
         if i == timestep:
             i = 0
             input = raw[:,0:19] 
-            
+            input[:,11]=input[:,11]%3000 
             input = (input-feature_mean)/feature_std
             input_lstm = input.reshape((1,timestep,19))
             label_lstm = lstm.predict(input_lstm)
@@ -132,8 +132,6 @@ while (True):
             f=open(csvname,'ab')
             np.savetxt(f,output,delimiter=",")
             f.close()
-            if os.path.getsize(csvname)>60000000 and j<15:
+            if os.path.getsize(csvname)>60000000 and j<6:
                 j = j+1
                 csvname = tm+str(j)+'.csv'
-                if j!=0 and j%3==0:
-                    break
