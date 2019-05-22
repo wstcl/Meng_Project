@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report,precision_score,recall_score,f1_score,accuracy_score
 import sys
 '''def label(csvname,output):
     data = pd.read_csv(csvname)
@@ -32,7 +32,7 @@ import sys
     data.to_csv(output)'''
 
 
-def label(csvname,output):
+def label(csvname,output='',eva=''):
     exter_eth = int('000c29d7eaec',16)
     label_index = 21
     data_raw = pd.read_csv(csvname)
@@ -42,9 +42,6 @@ def label(csvname,output):
     data[:,label_index-2:label_index]=data_raw[:,label_index-2:label_index]
     data[np.argwhere( (data[:,2]==502) & (data[:,6]==16) ),7]=0
     y_pre = data_raw[:,label_index].copy()
-
-
-
 
     #Function code = 16
     Write_index = np.argwhere(data[:,6]==16)
@@ -123,9 +120,18 @@ def label(csvname,output):
     data[crc, label_index-2] = 9
 
     print(classification_report(y_pre,data[:,label_index-2]))
-    np.savetxt(output,data,delimiter=',')
-
-
+    if output!='':
+        np.savetxt(output,data,delimiter=',')
+    if eva!='':
+        pi = precision_score(y_pre,data[:,label_index-2],average='micro')
+        pa = precision_score(y_pre,data[:,label_index-2],average='macro')
+        ri = recall_score(y_pre,data[:,label_index-2],average='micro')
+        ra = recall_score(y_pre,data[:,label_index-2],average='macro')
+        fi = f1_score(y_pre,data[:,label_index-2],average='micro')
+        fa = f1_score(y_pre,data[:,label_index-2],average='macro')
+        acc = accuracy_score(y_pre,data[:,label_index-2])
+        print(acc,',',pi,',',ri,',',fi,file=open(eva+"i.csv","a"))
+        print(acc,',',pa,',',ra,',',fa,file=open(eva+"a.csv","a"))
 
 def dos_mul(csvfile,output):
     data = np.loadtxxt(csvfile,delimiter=',')
@@ -138,9 +144,8 @@ def dos_mul(csvfile,output):
     scan = np.argwhere(data[:,19]==1)
     data[scan,19]=10
     np.savetxt(output,data,delimiter=',')
-label(sys.argv[1],sys.argv[2])
+#label(sys.argv[1],sys.argv[2],sys.argv[3])
 #mul_label('pcap file/label_AN_3.csv','pcap file/mulabel_AN_3.csv')
-    
 
 
 
