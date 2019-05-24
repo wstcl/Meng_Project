@@ -73,7 +73,7 @@ def mul_label_trans(csvfile,label,output):
 
 def get_mean_std(csvfile):
     data = np.loadtxt(csvfile,delimiter=',')
-    n_fs = data.shape[1]-1
+    n_fs = data.shape[1]
     mean = np.zeros(n_fs)
     std = np.zeros(n_fs)
     for i in range(n_fs):
@@ -91,6 +91,8 @@ def get_class_report(report):
     print(csv)
     np.savetxt('2lfnn_classification_report.csv',csv,delimiter=',')
 
+    
+
 #process('FNN_results/dos_mitm_l2/test.csv','FNN_results/dos_mitm_l2/test_mean.csv')
 #process('FNN_results/dos_mitm_l2/train.csv','FNN_results/dos_mitm_l2/train_mean.csv')
 #mul_label_trans('pcap file/mulabel_AN_3.csv','FNN_results/nondosl1(picked)/diff.csv','FNN_results/nondosl1(picked)/diff_mul.csv',)
@@ -102,10 +104,9 @@ def get_class_report(report):
 #m,s = get_mean_std('pcap file/1p5m.csv')
 #np.savetxt('shared/mean.csv',m,delimiter=',')
 #np.savetxt('shared/std.csv',s,delimiter=',')
-label = np.loadtxt('FNN_results/3lbar/indices_test.txt',delimiter=',')
-true = label[1,:]
-pre = label[2,:]
-c = classification_report(true,pre)
-print(c)
 #get_class_report(c)
-
+file_list = ['li.csv','la.csv','fi.csv','fa.csv']
+for i in range(4):
+    file = 'shared/'+file_list[i]
+    m,s=get_mean_std(file)
+    print(file_list[i],m,s)
