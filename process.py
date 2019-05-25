@@ -94,19 +94,40 @@ def get_class_report(report):
     
 
 #process('FNN_results/dos_mitm_l2/test.csv','FNN_results/dos_mitm_l2/test_mean.csv')
-#process('FNN_results/dos_mitm_l2/train.csv','FNN_results/dos_mitm_l2/train_mean.csv')
 #mul_label_trans('pcap file/mulabel_AN_3.csv','FNN_results/nondosl1(picked)/diff.csv','FNN_results/nondosl1(picked)/diff_mul.csv',)
-#process('FNN_results/Tue Apr 16 18:04:19 2019/train.csv','hlayers_res.csv')
 
-#process('FNN_results/Tue Apr 16 18:06:42 2019/train.csv','hlayers_res.csv')
-#process('FNN_results/Tue Apr 16 20:14:32 2019/train.csv','hlayers_res.csv')
-#process('FNN_results/Tue Apr 16 20:17:37 2019/train.csv','hlayers_res.csv')
 #m,s = get_mean_std('pcap file/1p5m.csv')
 #np.savetxt('shared/mean.csv',m,delimiter=',')
 #np.savetxt('shared/std.csv',s,delimiter=',')
 #get_class_report(c)
-file_list = ['li.csv','la.csv','fi.csv','fa.csv']
-for i in range(4):
-    file = 'shared/'+file_list[i]
-    m,s=get_mean_std(file)
-    print(file_list[i],m,s)
+
+#file_list = ['li.csv','la.csv','fi.csv','fa.csv']
+#for i in range(4):
+#    file = 'shared/'+file_list[i]
+#    m,s=get_mean_std(file)
+#    print(file_list[i],m,s)
+
+'''path = 'shared/evaluation_results/'
+dic = ['ensemble/','lstm/','fnn/']
+files = ['precision.csv','recall.csv','f1.csv']
+for f in files:
+    mean = np.zeros((3,11))
+    for d in range(len(dic)):
+        m,s = get_mean_std(path+dic[d]+f)
+        mean[d,:]=m
+    np.savetxt(path+f,mean,delimiter=',')
+'''
+
+path = 'shared/label/'     
+for i in range(10):
+    data = np.loadtxt(path+str(i)+'.csv',delimiter=',')
+    label = data[:,-1]
+    if i==0:
+        labels = label.copy()
+    else:
+        labels = np.append(labels,label)
+print('total:',labels.shape[0])
+print('nondos',labels[(labels>0)&(labels<8)].shape[0])
+print('dos',labels[labels>7].shape[0])
+
+
