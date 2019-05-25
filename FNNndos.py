@@ -43,6 +43,7 @@ def label(csvname,output='',eva=''):
     data[np.argwhere( (data[:,2]==502) & (data[:,6]==16) ),7]=0
     y_pre = data_raw[:,label_index].copy()
 
+
     #Function code = 16
     Write_index = np.argwhere(data[:,6]==16)
     Write_index = np.concatenate(Write_index)
@@ -123,15 +124,20 @@ def label(csvname,output='',eva=''):
     if output!='':
         np.savetxt(output,data,delimiter=',')
     if eva!='':
-        pi = precision_score(y_pre,data[:,label_index-2],average='micro')
-        pa = precision_score(y_pre,data[:,label_index-2],average='macro')
-        ri = recall_score(y_pre,data[:,label_index-2],average='micro')
-        ra = recall_score(y_pre,data[:,label_index-2],average='macro')
-        fi = f1_score(y_pre,data[:,label_index-2],average='micro')
-        fa = f1_score(y_pre,data[:,label_index-2],average='macro')
-        acc = accuracy_score(y_pre,data[:,label_index-2])
+
+        pi = precision_score(data[:,label_index-2],y_pre,average='micro')
+        pa = precision_score(data[:,label_index-2],y_pre,average='macro')
+        ri = recall_score(data[:,label_index-2],y_pre,average='micro')
+        ra = recall_score(data[:,label_index-2],y_pre,average='macro')
+        fi = f1_score(data[:,label_index-2],y_pre,average='micro')
+        fa = f1_score(data[:,label_index-2],y_pre,average='macro')
+        acc = accuracy_score(data[:,label_index-2],y_pre)
         print(acc,',',pi,',',ri,',',fi,file=open(eva+"i.csv","a"))
         print(acc,',',pa,',',ra,',',fa,file=open(eva+"a.csv","a"))
+    p = precision_score(data[:, label_index - 2], y_pre, average=None)
+    r = recall_score(data[:, label_index - 2], y_pre, average=None)
+    f = f1_score(data[:, label_index - 2], y_pre, average=None)
+    return p, r, f
 
 def dos_mul(csvfile,output):
     data = np.loadtxxt(csvfile,delimiter=',')
@@ -146,7 +152,18 @@ def dos_mul(csvfile,output):
     np.savetxt(output,data,delimiter=',')
 #label(sys.argv[1],sys.argv[2],sys.argv[3])
 #mul_label('pcap file/label_AN_3.csv','pcap file/mulabel_AN_3.csv')
+precision = np.zeros((10,11))
+recall = np.zeros((10,11))
+f1 = np.zeros((10,11))
 
+for i in range(10):
+    p,r,f = label('shared/cap/'+str(i)+'.csv')
+    precision[i,:]=p
+    recall[i,:]=r
+    f1[i,:]=f
+np.savetxt('shared/evaluation_results/ensemble/precision.csv',precision,delimiter=',')
+np.savetxt('shared/evaluation_results/ensemble/recall.csv',recall,delimiter=',')
+np.savetxt('shared/evaluation_results/ensemble/f1.csv',f1,delimiter=',')
 
 
 
