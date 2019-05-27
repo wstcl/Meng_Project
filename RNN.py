@@ -139,7 +139,7 @@ def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[],n_labels=
     y = Y.reshape(Y.shape[0] // timesteps, timesteps,n_labels)
     return X, y,feature_mean,feature_std
 
-def RNN(csvname,timesteps):
+def RNN(csvname):
     if len(sys.argv)==1:
         cm = ''
     else:
@@ -169,15 +169,15 @@ def RNN(csvname,timesteps):
     #del(data['eth_src'])
     #del(data['eth_dst'])
 
-    timestep = timesteps
+    timestep = 10
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
-    X, y,features_mean,features_std = data_reshape_multilabel(data, X_Label, timestep,n_labels=n_labels)
+    X, y,features_mean,features_std = data_reshape(data, X_Label, timestep,n_labels=n_labels)
     X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.2)
     #test_x, test_y,features_mean,features_std = data_reshape(test, X_Label, timestep,features_mean,features_std)
     num_seq = X_train.shape[0]
-    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,14000,15000,30000,80000,num_seq]
+    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,15000,num_seq]
     num_sample = [num_seq]
-    neurons = [2,1,4,2,8,4,16,8,32,16,64,32,128,64,256,128,512,256]
+    #neurons = [2,1,4,2,8,4,16,8,32,16,64,32,128,64,256,128,512,256]
     for sample_size in num_sample:
         es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 1)
         print(sample_size,file=open(train,"a"))
@@ -190,10 +190,10 @@ def RNN(csvname,timesteps):
             model = Sequential()
             indx = np.array(random.sample(range(X_train.shape[0]), sample_size))
             model.add(LSTM(128,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
-            model.add(LSTM(64))
+            model.add(LSTM(64,return_sequences=True))
 
-            model.add(Dense(n_labels*timestep, activation='sigmoid'))
-            model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
+            model.add(Dense(n_labels, activation='softmax'))
+            model.compile(loss='categorical_crossentropy', optimizer='adam',metrics = ['categorical_accuracy'])
             print(model.summary())
             model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =1000,shuffle = True,callbacks=[es])
             model.save(model_path+str(sample_size)+'_'+str(kfold)+'.h5')
@@ -304,9 +304,7 @@ def Performance_evaluation_multilabel(onlinecsv,output):
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
-ts = [10,20,30]
-for tps in ts:
-    RNN('pcap file/mulabel_AN_3.csv',tps)
+RNN('pcap file/label_mitm.csv')
 #RNN('label_mitm_mul.csv')
 '''
 from keras.models import load_model
