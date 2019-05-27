@@ -139,25 +139,29 @@ def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[],n_labels=
     y = Y.reshape(Y.shape[0] // timesteps, timesteps,n_labels)
     return X, y,feature_mean,feature_std
 
-def RNN(csvname):
+def RNN(csvname,timesteps):
     if len(sys.argv)==1:
         cm = ''
     else:
         cm = sys.argv[1]
     data = pd.read_csv(csvname)
     data = data.dropna()
-    #headers = ['SourceIp', 'DestIp', 'SourcePort', 'destPort', 'Seq_num', 'Trans_Id', 'funcCode', 'Refno',
-               #'Register_data', 'Exeption_Code', 'Time_Stamp', 'Relative_Time', 'Alarm']
-
+    
+    #headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','HH','LL','H','L','speed','t1','t2','Alarm']
     headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','HH','LL','H','L','speed','t1','t2','Alarm']
     data.columns = headers
+    #del(data['Relative_Time'])
+    
     tm = time.ctime() +'_'+cm+ '/'
     path = 'RNN_results/'
     os.mkdir(path + tm)
     os.mkdir(path + tm + 'model/')
     train = path + tm + "train.csv"
     test = path + tm + "test.csv"
-    n_labels=11
+    n_labels = np.array(data['Alarm'])
+    n_labels = np.unique(n_labels)
+    n_labels= n_labels.shape[0]
+    print(n_labels)
     indices_test = path + tm + "indices_test.csv"
     report = path+tm+"classification_report.txt"
     
@@ -165,17 +169,17 @@ def RNN(csvname):
     #del(data['eth_src'])
     #del(data['eth_dst'])
 
-    timestep = 10
+    timestep = timesteps
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
     X, y,features_mean,features_std = data_reshape_multilabel(data, X_Label, timestep,n_labels=n_labels)
-    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.3)
+    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.2)
     #test_x, test_y,features_mean,features_std = data_reshape(test, X_Label, timestep,features_mean,features_std)
     num_seq = X_train.shape[0]
-    num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,14000,15000,30000,80000,num_seq]
-    #num_sample = [num_seq]
+    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,14000,15000,30000,80000,num_seq]
+    num_sample = [num_seq]
     neurons = [2,1,4,2,8,4,16,8,32,16,64,32,128,64,256,128,512,256]
     for sample_size in num_sample:
-        es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 5)
+        es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 1)
         print(sample_size,file=open(train,"a"))
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(train,"a"))
         print(sample_size,file=open(test,"a"))
@@ -191,7 +195,7 @@ def RNN(csvname):
             model.add(Dense(n_labels*timestep, activation='sigmoid'))
             model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
             print(model.summary())
-            model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =2000,shuffle = True,callbacks=[es])
+            model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =1000,shuffle = True,callbacks=[es])
             model.save(model_path+str(sample_size)+'_'+str(kfold)+'.h5')
             y_pre = model.predict(X_train[indx])
             y_pre = y_pre.reshape((y_pre.shape[0]*timestep,n_labels))
@@ -300,7 +304,9 @@ def Performance_evaluation_multilabel(onlinecsv,output):
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
-RNN('pcap file/1p5m.csv')
+ts = [10,20,30]
+for tps in ts:
+    RNN('pcap file/mulabel_AN_3.csv',tps)
 #RNN('label_mitm_mul.csv')
 '''
 from keras.models import load_model
