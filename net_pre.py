@@ -8,7 +8,7 @@ path = 'shared/models/'
 mean = np.loadtxt(path+'mean.csv',delimiter=',')
 std = np.loadtxt(path + 'std.csv',delimiter=',')
 fnn = load_model(path+'FNN.h5')
-lstm = load_model(path+'LSTM.h5')
+lstm = load_model(path+'LSTM_mul.h5')
 timestep = 10
 n_classes=11
 
@@ -47,7 +47,7 @@ recall_f = np.zeros((10,11))
 f1_f = np.zeros((10,11))
 
 
-
+# for micro macro table of fnn and lstm, the ensemble part is in fnnndos
 for i in range(10):
     data = np.loadtxt('shared/label/'+str(i)+'.csv',delimiter=',')
     drop = data.shape[0]%timestep
@@ -64,14 +64,10 @@ for i in range(10):
     label_fnn = fnn.predict_classes(X)
     y = data[:,-1]
     print(y.shape)
-    pil,ril,fil,ail = evaluate_i(label_lstm,y)
     pal,ral,fal,aal = evaluate_a(label_lstm,y)
-    pif,rif,fif,aif = evaluate_i(label_fnn,y)
     paf,raf,faf,aaf = evaluate_a(label_fnn,y)
-    print(ail,',',pil,',',ril,',',fil,file=open('shared/li.csv','a'))
-    print(aal,',',pal,',',ral,',',fal,file=open('shared/la.csv','a'))
-    print(aif,',',pif,',',rif,',',fif,file=open('shared/fi.csv','a'))
-    print(aaf,',',paf,',',raf,',',faf,file=open('shared/fa.csv','a'))
+    print(pal,',',ral,',',fal,file=open('shared/lam.csv','a'))
+    print(paf,',',raf,',',faf,file=open('shared/fam.csv','a'))
     '''
     pl,rl,fl = evaluate_n(label_lstm,y)
     pf,rf,ff = evaluate_n(label_fnn,y)
@@ -89,6 +85,7 @@ np.savetxt('shared/evaluation_results/fnn/precision.csv',precision_f,delimiter='
 np.savetxt('shared/evaluation_results/fnn/recall.csv',recall_f,delimiter=',')
 np.savetxt('shared/evaluation_results/fnn/f1.csv',f1_f,delimiter=',')
 '''
+
 
 
 

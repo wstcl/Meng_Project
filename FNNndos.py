@@ -37,12 +37,15 @@ def label(csvname,output='',eva=''):
     label_index = 21
     data_raw = pd.read_csv(csvname)
     data_raw = np.array(data_raw)
+    data_raw_reg = data_raw[:,8]
+    data_raw_reg[data_raw_reg>32767]=-1*(65536-data_raw_reg[data_raw_reg>32767])
+    data_raw[:,8] = data_raw_reg
     data = np.zeros((data_raw.shape[0],label_index+1))
     data[:,0:12]=data_raw[:,0:12]
     data[:,label_index-2:label_index]=data_raw[:,label_index-2:label_index]
     data[np.argwhere( (data[:,2]==502) & (data[:,6]==16) ),7]=0
     y_pre = data_raw[:,label_index].copy()
-
+    
 
     #Function code = 16
     Write_index = np.argwhere(data[:,6]==16)
@@ -89,7 +92,7 @@ def label(csvname,output='',eva=''):
     data[Write_index[Label], label_index] = 7
     index_42215 = np.argwhere(data[:,7]==42215)
     data[index_42215,15]=data[index_42215,8]
-    
+     
     exter_index = np.argwhere(data[:,19:label_index]==exter_eth)
     mtim_index = np.argwhere(data[exter_index[:,0],0:2]==297913)
     mtim_index = exter_index[mtim_index[:,0],0]
@@ -124,7 +127,6 @@ def label(csvname,output='',eva=''):
     if output!='':
         np.savetxt(output,data,delimiter=',')
     if eva!='':
-
         pi = precision_score(data[:,label_index-2],y_pre,average='micro')
         pa = precision_score(data[:,label_index-2],y_pre,average='macro')
         ri = recall_score(data[:,label_index-2],y_pre,average='micro')
@@ -150,14 +152,17 @@ def dos_mul(csvfile,output):
     scan = np.argwhere(data[:,19]==1)
     data[scan,19]=10
     np.savetxt(output,data,delimiter=',')
-#label(sys.argv[1],sys.argv[2],sys.argv[3])
+#label(sys.argv[1],sys.argv[2])
+#label('pcap file/1p5m.csv','1p5m.csv')
 #mul_label('pcap file/label_AN_3.csv','pcap file/mulabel_AN_3.csv')
+
+#for bar plot ensemble 
 precision = np.zeros((10,11))
 recall = np.zeros((10,11))
 f1 = np.zeros((10,11))
 
 for i in range(10):
-    p,r,f = label('shared/cap/'+str(i)+'.csv')
+    p,r,f = label('shared/capture/'+str(i)+'.csv')
     precision[i,:]=p
     recall[i,:]=r
     f1[i,:]=f
@@ -165,5 +170,7 @@ np.savetxt('shared/evaluation_results/ensemble/precision.csv',precision,delimite
 np.savetxt('shared/evaluation_results/ensemble/recall.csv',recall,delimiter=',')
 np.savetxt('shared/evaluation_results/ensemble/f1.csv',f1,delimiter=',')
 
-
+#label('shared/capture/4.csv','shared/4_label.csv')
+#for i in range(10):
+#    label('shared/capture/'+str(i)+'.csv','shared/label/'+str(i)+'.csv')
 
