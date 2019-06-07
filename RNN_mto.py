@@ -22,9 +22,9 @@ IPhash = {'10.0.0.3':297913,
           '192.168.100.11':5884431}
 
 def evaluate(y_pred, y_test):
-    pre = precision_score(y_true=y_test,y_pred=y_pred,average='macro')
-    rec = recall_score(y_true=y_test,y_pred=y_pred,average='macro')
-    f1 = f1_score(y_true=y_test,y_pred=y_pred,average='macro')
+    pre = precision_score(y_true=y_test,y_pred=y_pred,average='micro')
+    rec = recall_score(y_true=y_test,y_pred=y_pred,average='micro')
+    f1 = f1_score(y_true=y_test,y_pred=y_pred,average='micro')
     return pre, rec, f1
 
 class LossHistory(keras.callbacks.Callback):
@@ -97,47 +97,6 @@ def pre_split(X,y,test_size):
     y_test = y[test_indx]
     return X_train, y_train, X_test,y_test,train_indx,test_indx
 
-def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[],n_labels=1):
-    if feature_mean != []:
-        mean = feature_mean
-        std = feature_std
-        index = 0
-        for i in label:
-            mean = feature_mean[index]
-            std = feature_std[index]
-
-            dst[i] = (dst[i] - mean) / std
-            index = index + 1
-        print("feature_mean:", feature_mean)
-        print("feature_std:", feature_std)
-    if feature_mean == []:
-        #Standardization
-        feature_mean = []
-        feature_std = []
-        for i in label:
-            mean = dst[i].mean()
-            std = dst[i].std()
-            if std == 0:
-                std=1
-            feature_mean.append(mean)
-            feature_std.append(std)
-            dst[i] = (dst[i] - mean) / std
-        print("feature_mean:", feature_mean)
-        print("feature_std:", feature_std)
-
-    #reshape
-    input = dst[label]
-    Y = dst['Alarm']
-    input = np.array(input)
-    Y = np.array(Y)
-    drop = input.shape[0] % timesteps
-    for i in range(drop):
-        input = np.delete(input, input.shape[0] - i - 1, axis=0)
-        Y = np.delete(Y, Y.shape[0] - i - 1, axis=0)
-    X = input.reshape((input.shape[0]//timesteps, timesteps, input.shape[1]))
-    Y = to_categorical(Y,num_classes=n_labels)
-    y = Y.reshape(Y.shape[0] // timesteps, timesteps,n_labels)
-    return X, y,feature_mean,feature_std
 
 def RNN(csvname):
     if len(sys.argv)==1:
@@ -147,13 +106,13 @@ def RNN(csvname):
     data = pd.read_csv(csvname)
     data = data.dropna()
     
+    #headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','HH','LL','H','L','speed','t1','t2','Alarm']
     headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','HH','LL','H','L','speed','t1','t2','Alarm']
-    #headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','Alarm']
     data.columns = headers
     #del(data['Relative_Time'])
     
     tm = time.ctime() +'_'+cm+ '/'
-    path = 'RNN_mtm/'
+    path = 'RNN_mto/'
     os.mkdir(path + tm)
     os.mkdir(path + tm + 'model/')
     train = path + tm + "train.csv"
@@ -163,7 +122,6 @@ def RNN(csvname):
     n_labels= n_labels.shape[0]
     print(n_labels)
     indices_test = path + tm + "indices_test.csv"
-    report = path+tm+"classification_report.txt"
     
     model_path = path + tm + 'model/'
     #del(data['eth_src'])
@@ -171,29 +129,29 @@ def RNN(csvname):
 
     timestep = 10
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
-    X, y,features_mean,features_std = data_reshape(data, X_Label, timestep,n_labels=n_labels)
-    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.2)
+    X, y,features_mean,features_std = data_reshape_multilabel(data, X_Label, timestep,n_labels=n_labels)
+    X_train, y_train, X_test, y_test, train_indx, test_indx=pre_split(X,y,test_size=0.3)
     #test_x, test_y,features_mean,features_std = data_reshape(test, X_Label, timestep,features_mean,features_std)
     num_seq = X_train.shape[0]
-    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,15000,num_seq]
+    #num_sample = [22,50,100,300,500,800,1000,2000,3000,5000,8000,10000,13000,14000,15000,num_seq]
     num_sample = [num_seq]
     #neurons = [2,1,4,2,8,4,16,8,32,16,64,32,128,64,256,128,512,256]
     for sample_size in num_sample:
-        es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 5)
+        es = EarlyStopping(monitor='loss',min_delta=1e-6, patience = 3)
         print(sample_size,file=open(train,"a"))
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(train,"a"))
         print(sample_size,file=open(test,"a"))
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(test,"a"))
         
         
-        for kfold in range(1):
+        for kfold in range(10):
             model = Sequential()
             indx = np.array(random.sample(range(X_train.shape[0]), sample_size))
             model.add(LSTM(256,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
-            model.add(LSTM(128,return_sequences=True))
+            model.add(LSTM(128))
 
-            model.add(Dense(n_labels, activation='softmax'))
-            model.compile(loss='categorical_crossentropy', optimizer='adam',metrics = ['categorical_accuracy'])
+            model.add(Dense(n_labels*timestep, activation='sigmoid'))
+            model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
             print(model.summary())
             model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =1000,shuffle = True,callbacks=[es])
             model.save(model_path+str(sample_size)+'_'+str(kfold)+'.h5')
@@ -220,7 +178,7 @@ def RNN(csvname):
             loss_test = atest[0]
             print(ptrain, ',', rtrain, ',', ftrain, ',', acc_train, ',', loss_train, file=open(train, "a"))
             print(ptest, ',', rtest, ',', ftest, ',', acc_test, ',', loss_test, file=open(test, "a"))
-            if sample_size==num_seq and kfold==10:
+            if sample_size==num_seq:
                 labels = np.zeros((2, y_pre_test.shape[0]))
                 labels[0, :] = np.transpose(y_test_true)
                 labels[1, :] = np.transpose(y_pre_test)
@@ -235,8 +193,8 @@ def RNN(csvname):
 
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
-RNN('pcap file/1p2m.csv')
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+RNN('pcap file/label_AN_3.csv')
 #RNN('pcap file/label_mitm.csv')
 #RNN('label_mitm_mul.csv')
 '''
