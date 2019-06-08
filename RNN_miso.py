@@ -24,9 +24,9 @@ IPhash = {'10.0.0.3':297913,
 
 
 def evaluate(y_pred, y_test):
-    pre = precision_score(y_true=y_test,y_pred=y_pred)
-    rec = recall_score(y_true=y_test,y_pred=y_pred)
-    f1 = f1_score(y_true=y_test,y_pred=y_pred)
+    pre = precision_score(y_true=y_test,y_pred=y_pred,average='macro')
+    rec = recall_score(y_true=y_test,y_pred=y_pred,average='macro')
+    f1 = f1_score(y_true=y_test,y_pred=y_pred,average='macro')
     return pre, rec, f1
 
 class LossHistory(keras.callbacks.Callback):
@@ -149,12 +149,12 @@ def miso_prepare(data,timesteps):
     X_raw = data[:,:-1]
     X_raw = preprocessing.scale(X_raw)
     X = np.zeros((n_p-timesteps,timesteps,data.shape[1]-1))
-    y = np.zeros((n_p-timesteps,timesteps)) #need to be rescheduled for multi_label
+    y = np.zeros((n_p-timesteps,timesteps,1)) #need to be rescheduled for multi_label
     #print(X.shape)
     y_raw = data[:,-1] #reschedule for multi-label
     for i in range(timesteps,n_p):
         X[i-timesteps]=X_raw[i-timesteps:i,:]
-        y[i-timesteps]=y_raw[i-timesteps:i]
+        y[i-timesteps]=y_raw[i-timesteps:i].reshape((10,1))
     print(X.shape)
     print(y.shape)
     return X,y
@@ -169,7 +169,7 @@ def RNN(csvname):
     #headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','HH','LL','H','L','speed','t1','t2','Alarm']
     #data.columns = headers
     print("please add comment:")
-    comment = input()
+    comment = 'an3_mitm_mtm_es3'
     tm = time.ctime() +'_'+comment+ '/'
     path = '/opt/jungao/RNN_results/'
     os.mkdir(path + tm)
@@ -207,29 +207,30 @@ def RNN(csvname):
             model.reset_states()
             indx = np.array(random.sample(range(X_train.shape[0]), sample_size))
             model.add(LSTM(256,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
-            model.add(LSTM(128))
+            model.add(LSTM(128,return_sequences=True))
 
-            model.add(Dense(timestep, activation='sigmoid'))
+            model.add(Dense(1, activation='sigmoid'))
             model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
             print(model.summary())
             model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =1000,shuffle = True,callbacks=[es])
             
             y_pre = model.predict(X_train[indx])
-            y_pre = y_pre[:,timestep-1]
+            
+            y_pre = y_pre[:,timestep-1,:]
             y_pre[y_pre>=0.5]=1
             y_pre[y_pre<0.5]=0
             #y_pre = np.argmax(y_pre,axis=1)
             y_true = y_train[indx]
-            y_true = y_true[:,timestep-1]
+            y_true = y_true[:,timestep-1,:]
             #y_true = np.argmax(y_true,axis=1)
             #y_true = y_train[indx]
             y_pre_test = model.predict(X_test)
-            y_pre_test = y_pre_test[:,timestep-1]
+            y_pre_test = y_pre_test[:,timestep-1,:]
             y_pre_test[y_pre_test>=0.5]=1
 
             y_pre_test[y_pre_test<0.5]=0
             #y_pre_test = np.argmax(y_pre_test, axis=1)
-            y_test_true = y_test[:,timestep-1]
+            y_test_true = y_test[:,timestep-1,:]
             #y_test_true = np.argmax(y_test_true,axis=1)
             #y_test_true = y_test
             ptrain, rtrain, ftrain = evaluate(y_pre, y_true)
@@ -260,6 +261,7 @@ def RNN(csvname):
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
 #RNN('pcap file/label_AN_3.csv')
-os.environ["VISIBLE_DEVICES"]="1"
+os.environ["VISIBLE_DEVICES"]= "0"
 RNN('pcap file/label_AN_3.csv')
+RNN('pcap file/label_mitm.csv')
 #Performance_evaluation_multilabel('mtim.csv','Mlabel_Mtim.csv')
