@@ -22,9 +22,9 @@ IPhash = {'10.0.0.3':297913,
           '192.168.100.11':5884431}
 
 def evaluate(y_pred, y_test):
-    pre = precision_score(y_true=y_test,y_pred=y_pred,average='macro')
-    rec = recall_score(y_true=y_test,y_pred=y_pred,average='macro')
-    f1 = f1_score(y_true=y_test,y_pred=y_pred,average='macro')
+    pre = precision_score(y_true=y_test,y_pred=y_pred)
+    rec = recall_score(y_true=y_test,y_pred=y_pred)
+    f1 = f1_score(y_true=y_test,y_pred=y_pred)
     return pre, rec, f1
 
 class LossHistory(keras.callbacks.Callback):
@@ -135,7 +135,7 @@ def data_reshape(dst, label, timesteps,feature_mean=[], feature_std=[],n_labels=
         input = np.delete(input, input.shape[0] - i - 1, axis=0)
         Y = np.delete(Y, Y.shape[0] - i - 1, axis=0)
     X = input.reshape((input.shape[0]//timesteps, timesteps, input.shape[1]))
-    Y = to_categorical(Y,num_classes=n_labels)
+    #Y = to_categorical(Y,num_classes=n_labels)
     y = Y.reshape(Y.shape[0] // timesteps, timesteps,n_labels)
     return X, y,feature_mean,feature_std
 
@@ -158,9 +158,10 @@ def RNN(csvname):
     os.mkdir(path + tm + 'model/')
     train = path + tm + "train.csv"
     test = path + tm + "test.csv"
-    n_labels = np.array(data['Alarm'])
-    n_labels = np.unique(n_labels)
-    n_labels= n_labels.shape[0]
+    n_labels=1
+    #n_labels = np.array(data['Alarm'])
+    #n_labels = np.unique(n_labels)
+    #n_labels= n_labels.shape[0]
     print(n_labels)
     indices_test = path + tm + "indices_test.csv"
     report = path+tm+"classification_report.txt"
@@ -186,28 +187,28 @@ def RNN(csvname):
         print("Precision",',',"Recall",',',"F1",',',"Accuray",',',"loss",file=open(test,"a"))
         
         
-        for kfold in range(1):
+        for kfold in range(10):
             model = Sequential()
             indx = np.array(random.sample(range(X_train.shape[0]), sample_size))
             model.add(LSTM(256,return_sequences=True,input_shape=(X.shape[1],X.shape[2])))
             model.add(LSTM(128,return_sequences=True))
 
-            model.add(Dense(n_labels, activation='softmax'))
-            model.compile(loss='categorical_crossentropy', optimizer='adam',metrics = ['categorical_accuracy'])
+            model.add(Dense(n_labels, activation='sigmoid'))
+            model.compile(loss='binary_crossentropy', optimizer='adam',metrics = ['accuracy'])
             print(model.summary())
             model.fit(X_train[indx], y_train[indx],epochs=5000,batch_size =1000,shuffle = True,callbacks=[es])
             model.save(model_path+str(sample_size)+'_'+str(kfold)+'.h5')
             y_pre = model.predict(X_train[indx])
             y_pre = y_pre.reshape((y_pre.shape[0]*timestep,n_labels))
-            y_pre = np.argmax(y_pre,axis=1)
+            y_pre[y_pre>=0.5]=1
+            y_pre[y_pre<0.5]=0
             y_true = y_train[indx].reshape((y_train[indx].shape[0]*timestep,n_labels))
-            y_true = np.argmax(y_true,axis=1)
 
             y_pre_test = model.predict(X_test)
             y_pre_test = y_pre_test.reshape((y_pre_test.shape[0] * timestep, n_labels))
-            y_pre_test = np.argmax(y_pre_test, axis=1)
+            y_pre_test[y_pre_test>=0.5]=1
+            y_pre_test[y_pre_test<0.5]=0
             y_test_true = y_test.reshape((y_test.shape[0]*timestep,n_labels))
-            y_test_true = np.argmax(y_test_true,axis=1)
 
             ptrain, rtrain, ftrain = evaluate(y_pre, y_true)
             ptest, rtest, ftest = evaluate(y_pre_test, y_test_true)
@@ -236,7 +237,7 @@ def RNN(csvname):
 #data_process('D:\\dos_pcap\\Dec2_4.csv','D:\\dos_pcap\\Dec2_4_output.csv')
 #Performance_evaluation('mtim.csv','Label_Mtim.csv')
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
-RNN('pcap file/1p2m.csv')
+RNN('pcap file/label_mitm.csv')
 #RNN('pcap file/label_mitm.csv')
 #RNN('label_mitm_mul.csv')
 '''
