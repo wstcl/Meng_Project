@@ -7,3 +7,5 @@ The RNN.py can process the raw data from the testbed and make a LSTM classificat
 change the location of training dataset and the test dataset. 
 
 The dostraffic.sh is for generating normal and dos attack traffic.
+
+Modbus_IDS is the IDS structure for SCADA systems. Trained machine learning models in keras could be embedded into this structure as ani virus engine.
