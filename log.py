@@ -15,9 +15,9 @@ import random
 import time
 import os
 def evaluate(y_pred, y_test):
-    pre = precision_score(y_true=y_test,y_pred=y_pred,average='micro')
-    rec = recall_score(y_true=y_test,y_pred=y_pred,average='micro')
-    f1 = f1_score(y_true=y_test,y_pred=y_pred,average='micro')
+    pre = precision_score(y_true=y_test,y_pred=y_pred)
+    rec = recall_score(y_true=y_test,y_pred=y_pred)
+    f1 = f1_score(y_true=y_test,y_pred=y_pred)
     return pre, rec, f1
 
 class LossHistory(keras.callbacks.Callback):
@@ -38,7 +38,7 @@ def pre_split(input_data, Label,test_size):
     num_packets = X.shape[0]
     y = input_data['Alarm']
     y = np.array(y,dtype=int)
-    y = to_categorical(y)
+    #y = to_categorical(y)
     test_indx =np.array(random.sample(range(num_packets),int(test_size*num_packets)))
     #np.savetxt("ori_label.csv",np.argmax(y[test_indx],axis=1))
     train_indx = np.setdiff1d(np.array(range(num_packets)),test_indx)
@@ -50,7 +50,9 @@ def pre_split(input_data, Label,test_size):
 
 def logistic(csvname):
     data = pd.read_csv(csvname)
+    #headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','eth_src','eth_dst','Alarm']
     headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','eth_src','eth_dst','Alarm']
+
     data.columns = headers
     del(data['eth_src'])
     del(data['eth_dst'])
@@ -104,9 +106,11 @@ def logistic_nondos(csvname):
     else:
         cm = sys.argv[1]
     data = pd.read_csv(csvname)
+    #headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','Alarm']
     headers = ['SourceIp','DestIp','SourcePort','destPort','Seq_num','Trans_Id','funcCode','Refno','Register_data','Exeption_Code','Time_Stamp','Relative_Time','HH','LL','H','L','speed','tank1','tank2','Alarm']
+
     tm = time.ctime() +'_'+cm+ '/'
-    path = 'FNN_results/'
+    path = 'correct_fnn_results/'
     os.mkdir(path+tm)
     os.mkdir(path+tm+'model/')
     train = path+tm+"train.csv"
@@ -122,12 +126,12 @@ def logistic_nondos(csvname):
     data.columns = headers
     data = data.dropna()
     X_Label = [i for i in data.columns.tolist() if i not in 'Alarm']
-    X_train, y_train,X_test,y_test, train_indx,test_indx = pre_split(data, X_Label,0.2)
+    X_train, y_train,X_test,y_test, train_indx,test_indx = pre_split(data, X_Label,0.3)
     
     #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=193)
 
     num_seq = X_train.shape[0]
-    #num_sample =[22,50,100,1000,3000,6000,10000,30000,70000,100000,150000,500000,1000000,num_seq]
+    #num_sample =[22,50,100,1000,3000,6000,10000,30000,70000,100000,150000,200000,num_seq]
     num_sample = [num_seq]
     for sample_size in num_sample:
         es = EarlyStopping(monitor='loss', min_delta=1e-6,patience = 35)
@@ -138,7 +142,7 @@ def logistic_nondos(csvname):
         #print(sample_size,file=open(label_train,"a"))
         #print(sample_size,file=open(label_test,"a"))
 
-        for kfold in range(1):
+        for kfold in range(10):
             print(sample_size)
              
             model = Sequential()
@@ -146,21 +150,25 @@ def logistic_nondos(csvname):
             print(X_train[indx].shape)
             model.reset_states()
             model.add(Dense(100,activation ='relu'))
-            model.add(Dense(100,activation='relu'))
-            model.add(Dense(100,activation='relu'))
-            model.add(Dense(100,activation='relu'))
+            #model.add(Dense(100,activation='relu'))
             #model.add(Dense(20,activation='relu'))
             #model.add(Dense(100,kernel_initializer=initializers.RandomNormal(stddev=0.1),activation ='relu'))
 
-            model.add(Dense(y_test.shape[1],activation='softmax'))
-            model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['categorical_accuracy'])
-            model.fit(X_train[indx], y_train[indx], batch_size = 2000,shuffle=True,epochs=10000,callbacks=[es])
+            model.add(Dense(1,activation='sigmoid'))
+            model.compile(loss='binary_crossentropy', optimizer='adam',metrics=['accuracy'])
+            model.fit(X_train[indx], y_train[indx], batch_size = 1000,shuffle=True,epochs=10000,callbacks=[es])
             model.save(model_path+str(sample_size)+'_'+str(kfold)+".h5")
-            y_pre_train = model.predict_classes(X_train[indx])
-            y_pre_test = model.predict_classes(X_test)
+            y_pre_train = model.predict(X_train[indx])
+            y_pre_train[y_pre_train>=0.5]=1
+            y_pre_train[y_pre_train<0.5]=0
+
+            y_pre_test = model.predict(X_test)
+            y_pre_test[y_pre_test>=0.5]=1
+            y_pre_test[y_pre_test<0.5]=0
+
             #print(X_test)
-            y_true_train = np.argmax(y_train[indx],axis=1) 
-            y_true_test = np.argmax(y_test,axis=1)
+            y_true_train = y_train[indx] 
+            y_true_test = y_test
             ptrain,rtrain,ftrain = evaluate(y_pre_train,y_true_train)
             ptest,rtest,ftest = evaluate(y_pre_test,y_true_test)
 
@@ -191,12 +199,11 @@ def logistic_nondos(csvname):
                 f = open(indices_test,'a')
                 np.savetxt(f,labels,delimiter=',')
                 f.close()
-            print(classification_report(y_true_test,y_pre_test))
 
 
 #logistic('Label_Jan27b.csv')
 #NN('Label_Jan27b.csv')
 #logistic('Mlabel_Mtim.csv')
 #logistic_nondos('pcap file/label_AN_3.csv')
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
-logistic_nondos('pcap file/1p5m.csv')
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+logistic_nondos('pcap file/label_AN_3.csv')
