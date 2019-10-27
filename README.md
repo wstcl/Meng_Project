@@ -10,4 +10,4 @@ The dostraffic.sh is for generating normal and dos attack traffic.
 
 Modbus_IDS is the IDS structure for SCADA systems. Trained machine learning models in keras could be embedded into this structure as ani virus engine.
 
-The datasets are available in: http://jungao.org:8000/ (New domain would be applied soon). This website is still in debugging so that sometimes may lost.
+The datasets are available in: http://jungao.org/ (New domain would be applied soon). This website is still in debugging so that sometimes may lost.
